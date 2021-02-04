@@ -76,7 +76,7 @@ function dtSource(dataSourcesMap) {
       var href = $(this).attr("data-href")
       var mod = $(this).attr("data-module")
       if (link != "") {
-        newData({
+        newData({dataSource: dataSourcesMap[link],
           link: link,
           mod: mod,
           href: href,
@@ -103,7 +103,7 @@ function newData(params) {
   var link = params["link"]
   var href = params["href"]
   var data = params["data"]
-  var customCols = params["customCols"]
+  var customCols = dataSource.elements;
 if (dataSource != null) {
 
  var curData =  dataSource.table.data()[params.index]
