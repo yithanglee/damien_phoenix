@@ -21,14 +21,14 @@ defmodule Mix.Tasks.Phx.Digest.Clean do
   ## Options
 
     * `-o, --output` - indicates the path to your compiled
-      assets directory. Defaults to `priv/static`.
+      assets directory. Defaults to `priv/static`
 
     * `--age` - specifies a maximum age (in seconds) for assets.
       Files older than age that are not in the last `--keep` versions
-      will be removed. Defaults to 3600 (1 hour).
+      will be removed. Defaults to 3600 (1 hour)
 
     * `--keep` - specifies how many previous versions of assets to keep.
-      Defaults to 2 previous version.
+      Defaults to 2 previous versions
 
   """
 
@@ -49,9 +49,9 @@ defmodule Mix.Tasks.Phx.Digest.Clean do
         # true. In case it's not true, build structure is mostly a no-op, so we
         # are fine.
         Mix.Project.build_structure()
-        Mix.shell.info [:green, "Clean complete for #{inspect output_path}"]
+        Mix.shell().info [:green, "Clean complete for #{inspect output_path}"]
       {:error, :invalid_path} ->
-        Mix.shell.error "The output path #{inspect output_path} does not exist"
+        Mix.shell().error "The output path #{inspect output_path} does not exist"
     end
   end
 end

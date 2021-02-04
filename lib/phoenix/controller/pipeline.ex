@@ -75,7 +75,10 @@ defmodule Phoenix.Controller.Pipeline do
   defmacro __before_compile__(env) do
     action = {:action, [], true}
     plugs  = [action|Module.get_attribute(env.module, :plugs)]
-    {conn, body} = Plug.Builder.compile(env, plugs, log_on_halt: :debug)
+    {conn, body} = Plug.Builder.compile(env, plugs,
+      log_on_halt: :debug,
+      init_mode: Phoenix.plug_init_mode())
+
     fallback_ast =
       env.module
       |> Module.get_attribute(:phoenix_fallback)
@@ -130,12 +133,12 @@ defmodule Phoenix.Controller.Pipeline do
 
   @doc false
   def __catch__(%Plug.Conn{}, :function_clause, controller, action,
-                [{controller, action, [%Plug.Conn{} = conn | _], _loc} | _] = stack) do
-    args = [controller: controller, action: action, params: conn.params]
+      [{controller, action, [%Plug.Conn{} | _] = action_args, _loc} | _] = stack) do
+    args = [module: controller, function: action, arity: length(action_args), args: action_args]
     reraise Phoenix.ActionClauseError, args, stack
   end
   def __catch__(%Plug.Conn{} = conn, reason, _controller, _action, stack) do
-    Phoenix.PlugError.reraise(conn, :error, reason, stack)
+    Plug.Conn.WrapperError.reraise(conn, :error, reason, stack)
   end
 
   @doc """
@@ -144,10 +147,10 @@ defmodule Phoenix.Controller.Pipeline do
   defmacro plug(plug)
 
   defmacro plug({:when, _, [plug, guards]}), do:
-    plug(plug, [], guards)
+    plug(plug, [], guards, __CALLER__)
 
   defmacro plug(plug), do:
-    plug(plug, [], true)
+    plug(plug, [], true, __CALLER__)
 
   @doc """
   Stores a plug with the given options to be executed as part of
@@ -156,14 +159,31 @@ defmodule Phoenix.Controller.Pipeline do
   defmacro plug(plug, opts)
 
   defmacro plug(plug, {:when, _, [opts, guards]}), do:
-    plug(plug, opts, guards)
+    plug(plug, opts, guards, __CALLER__)
 
   defmacro plug(plug, opts), do:
-    plug(plug, opts, true)
+    plug(plug, opts, true, __CALLER__)
 
-  defp plug(plug, opts, guards) do
+  defp plug(plug, opts, guards, caller) do
+    plug = Macro.expand(plug, %{caller | function: {:init, 1}})
     quote do
-      @plugs {unquote(plug), unquote(opts), unquote(Macro.escape(guards))}
+      @plugs {unquote(plug), unquote(opts), unquote(escape_guards(guards))}
     end
   end
+
+  defp escape_guards({pre_expanded, _, [_ | _]} = node)
+       when pre_expanded in [:@, :__aliases__],
+       do: node
+
+  defp escape_guards({left, meta, right}),
+    do: {:{}, [], [escape_guards(left), meta, escape_guards(right)]}
+
+  defp escape_guards({left, right}),
+    do: {escape_guards(left), escape_guards(right)}
+
+  defp escape_guards([_ | _] = list),
+    do: Enum.map(list, &escape_guards/1)
+
+  defp escape_guards(node),
+    do: node
 end

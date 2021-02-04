@@ -27,7 +27,7 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
             order_by: ^order_by
           )
         )
-        |> Enum.map(fn x -> <%= inspect context.base_module %>.s_to_map(x) end)
+        |> Enum.map(fn x -> Utility.s_to_map(x) end)
       json =
       %{
         data: data2,
@@ -39,7 +39,7 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
       |> put_resp_content_type("application/json")
       |> send_resp(
         200,
-        Poison.encode!(json)
+        Jason.encode!(json)
       )
     else
       <%= schema.plural %> = <%= inspect context.alias %>.list_<%= schema.plural %>()
@@ -67,7 +67,7 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
                 {:ok, <%= schema.singular %>} ->
                   conn
                   |> put_resp_content_type("application/json")
-                  |> send_resp(200, Poison.encode!(<%= inspect context.base_module %>.s_to_map(<%= schema.singular %>)))
+                  |> send_resp(200, Jason.encode!(Utility.s_to_map(<%= schema.singular %>)))
                 {:error, %Ecto.Changeset{} = changeset} ->
                   errors = changeset.errors |> Keyword.keys()
 
@@ -77,14 +77,14 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
 
                   conn
                   |> put_resp_content_type("application/json")
-                  |> send_resp(500, Poison.encode!(%{status: final_reason}))
+                  |> send_resp(500, Jason.encode!(%{status: final_reason}))
               end
           else
               case <%= inspect context.alias %>.update_<%= schema.singular %>(<%= schema.singular %>, <%= schema.singular %>_params) do
                 {:ok, <%= schema.singular %>} ->
                   conn
                   |> put_resp_content_type("application/json")
-                  |> send_resp(200, Poison.encode!(<%= inspect context.base_module %>.s_to_map(<%= schema.singular %>)))
+                  |> send_resp(200, Jason.encode!(Utility.s_to_map(<%= schema.singular %>)))
                 {:error, %Ecto.Changeset{} = changeset} ->
                   errors = changeset.errors |> Keyword.keys()
 
@@ -94,7 +94,7 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
 
                   conn
                   |> put_resp_content_type("application/json")
-                  |> send_resp(500, Poison.encode!(%{status: final_reason}))
+                  |> send_resp(500, Jason.encode!(%{status: final_reason}))
               end
           end 
         
@@ -104,7 +104,7 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
         {:ok, <%= schema.singular %>} ->
           conn
           |> put_flash(:info, "<%= schema.human_singular %> created successfully.")
-          |> redirect(to: <%= schema.route_helper %>_path(conn, :show, <%= schema.singular %>))
+          |> redirect(to: Routes.<%= schema.route_helper %>_path(conn, :show, <%= schema.singular %>))
         {:error, %Ecto.Changeset{} = changeset} ->
           render(conn, "new.html", changeset: changeset)
       end
@@ -129,7 +129,7 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
       {:ok, <%= schema.singular %>} ->
         conn
         |> put_flash(:info, "<%= schema.human_singular %> updated successfully.")
-        |> redirect(to: <%= schema.route_helper %>_path(conn, :show, <%= schema.singular %>))
+        |> redirect(to: Routes.<%= schema.route_helper %>_path(conn, :show, <%= schema.singular %>))
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, "edit.html", <%= schema.singular %>: <%= schema.singular %>, changeset: changeset)
     end
@@ -144,16 +144,16 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
       if Enum.any?(conn.path_info, fn x -> x == "api" end) do
         conn
         |> put_resp_content_type("application/json")
-        |> send_resp(200, Poison.encode!(%{status: "ok"}))
+        |> send_resp(200, Jason.encode!(%{status: "ok"}))
       else
         conn
         |> put_flash(:info, "<%= schema.human_singular %> deleted successfully.")
-        |> redirect(to: <%= schema.route_helper %>_path(conn, :index))
+        |> redirect(to: Routes.<%= schema.route_helper %>_path(conn, :index))
       end
     else
       conn
       |> put_resp_content_type("application/json")
-      |> send_resp(200, Poison.encode!(%{status: "already deleted"}))
+      |> send_resp(200, Jason.encode!(%{status: "already deleted"}))
     end
   end
 end

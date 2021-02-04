@@ -6,7 +6,7 @@ defmodule Mix.Tasks.Phx.Digest do
   @recursive true
 
   @moduledoc """
-  Digests and compress static files.
+  Digests and compresses static files.
 
       mix phx.digest
       mix phx.digest priv/static -o /www/public
@@ -32,6 +32,7 @@ defmodule Mix.Tasks.Phx.Digest do
     * app-eb0a5b9302e8d32828d8a73f137cc8f0.js
     * app-eb0a5b9302e8d32828d8a73f137cc8f0.js.gz
     * cache_manifest.json
+
   """
 
   @doc false
@@ -50,9 +51,9 @@ defmodule Mix.Tasks.Phx.Digest do
         # build_embedded set to true. In case it's not true,
         # build structure is mostly a no-op, so we are fine.
         Mix.Project.build_structure()
-        Mix.shell.info [:green, "Check your digested files at #{inspect output_path}"]
+        Mix.shell().info [:green, "Check your digested files at #{inspect output_path}"]
       {:error, :invalid_path} ->
-        Mix.shell.error "The input path #{inspect input_path} does not exist"
+        Mix.shell().error "The input path #{inspect input_path} does not exist"
     end
   end
 end

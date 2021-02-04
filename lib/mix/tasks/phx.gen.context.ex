@@ -12,23 +12,25 @@ defmodule Mix.Tasks.Phx.Gen.Context do
   The context is an Elixir module that serves as an API boundary for
   the given resource. A context often holds many related resources.
   Therefore, if the context already exists, it will be augmented with
-  functions for the given resource. Note a resource may also be split
-  over distinct contexts (such as Accounts.User and Payments.User).
+  functions for the given resource.
+
+  > Note: A resource may also be split
+  > over distinct contexts (such as Accounts.User and Payments.User).
 
   The schema is responsible for mapping the database fields into an
   Elixir struct.
 
-  Overall, this generator will add the following files to lib/your_app:
+  Overall, this generator will add the following files to `lib/your_app`:
 
-    * a context module in accounts/accounts.ex, serving as the API boundary
-    * a schema in accounts/user.ex, with a `users` table
+    * a context module in `accounts.ex`, serving as the API boundary
+    * a schema in `accounts/user.ex`, with a `users` table
 
   A migration file for the repository and test files for the context
   will also be generated.
 
   ## Generating without a schema
 
-  In some cases, you may wish to boostrap the context module and
+  In some cases, you may wish to bootstrap the context module and
   tests, but leave internal implementation of the context and schema
   to yourself. Use the `--no-schema` flags to accomplish this.
 
@@ -75,7 +77,7 @@ defmodule Mix.Tasks.Phx.Gen.Context do
 
   @doc false
   def run(args) do
-    if Mix.Project.umbrella? do
+    if Mix.Project.umbrella?() do
       Mix.raise "mix phx.gen.context can only be run inside an application directory"
     end
 
@@ -84,6 +86,7 @@ defmodule Mix.Tasks.Phx.Gen.Context do
     paths = Mix.Phoenix.generator_paths()
 
     prompt_for_conflicts(context)
+    prompt_for_code_injection(context)
 
     context
     |> copy_new_files(paths, binding)
@@ -168,7 +171,7 @@ defmodule Mix.Tasks.Phx.Gen.Context do
     if String.contains?(file, content_to_inject) do
       :ok
     else
-      Mix.shell.info([:green, "* injecting ", :reset, Path.relative_to_cwd(file_path)])
+      Mix.shell().info([:green, "* injecting ", :reset, Path.relative_to_cwd(file_path)])
 
       file
       |> String.trim_trailing()
@@ -205,6 +208,10 @@ defmodule Mix.Tasks.Phx.Gen.Context do
         raise_with_help "Expected the schema, #{inspect schema}, to be a valid module name"
       context == schema ->
         raise_with_help "The context and schema should have different names"
+      context == Mix.Phoenix.base() ->
+        raise_with_help "Cannot generate context #{context} because it has the same name as the application"
+      schema == Mix.Phoenix.base() ->
+        raise_with_help "Cannot generate schema #{schema} because it has the same name as the application"
       true ->
         args
     end
@@ -233,5 +240,33 @@ defmodule Mix.Tasks.Phx.Gen.Context do
     Multiple resources may belong to a context and a resource may be
     split over distinct contexts (such as Accounts.User and Payments.User).
     """
+  end
+
+  def prompt_for_code_injection(%Context{} = context) do
+    if Context.pre_existing?(context) do
+      function_count = Context.function_count(context)
+      file_count = Context.file_count(context)
+
+      Mix.shell().info """
+      You are generating into an existing context.
+
+      The #{inspect context.module} context currently has #{function_count} functions and \
+      #{file_count} files in its directory.
+
+        * It's OK to have multiple resources in the same context as \
+      long as they are closely related. But if a context grows too \
+      large, consider breaking it apart
+
+        * If they are not closely related, another context probably works better
+
+      The fact two entities are related in the database does not mean they belong \
+      to the same context.
+
+      If you are not sure, prefer creating a new context over adding to the existing one.
+      """
+      unless Mix.shell().yes?("Would you like to proceed?") do
+        System.halt()
+      end
+    end
   end
 end
