@@ -1,4 +1,15 @@
+$(document).on("change", "input[name='users[password]']", function(){
+  var v = $("input[name='users[password]']").val()
+  $("input[name='users[crypted_password]']").val(hashPW(v));
 
+})
+
+function hashPW(pw){
+  var hashObj = new jsSHA("SHA-512", "TEXT", { numRounds: 1 });
+  hashObj.update(pw);
+  var hash = hashObj.getHash("HEX");
+  return hash
+}
 
 function dtSource(dataSourcesMap) {
   this.dataSources = dataSourcesMap; 
@@ -76,11 +87,12 @@ function dtSource(dataSourcesMap) {
       var href = $(this).attr("data-href")
       var mod = $(this).attr("data-module")
       if (link != "") {
-        newData({dataSource: dataSourcesMap[link],
+        newData({
           link: link,
           mod: mod,
           href: href,
-          data: {id: 0}
+          data: {id: 0},
+          customCols: dataSourcesMap[link].elements
         })
       } else {
         alert("please click on a label")
@@ -103,7 +115,7 @@ function newData(params) {
   var link = params["link"]
   var href = params["href"]
   var data = params["data"]
-  var customCols = dataSource.elements;
+  var customCols = params["customCols"]
 if (dataSource != null) {
 
  var curData =  dataSource.table.data()[params.index]
@@ -197,6 +209,7 @@ function populateTable(dataSource) {
     },
     columns: dataSource.columns,
     rowCallback: function (row, dtdata, index) {
+      dataSource.allData.push(dtdata)
       $(row).attr("aria-index", index);
       lastCol = $(row).find("td").length - 1;
       $("td:eq(" + lastCol + ")", row).attr("class", "td-actions");
@@ -710,6 +723,29 @@ function generateInputs(j, v, object, qv){
                 "</select></div>";
 
             }
+            if (qv.checkboxes != null) {
+              var checkboxes = []
+              $(qv.checkboxes).each((i,checkbox) => {
+                var c = `
+                    <div class="form-check">
+                      <label class="form-check-label">
+                        <input class="form-check-input" type="checkbox" name="` +
+                object +
+                "[" +
+                v +
+                `][`+checkbox.id+`]"  value="true"> `+checkbox.name+`
+                        <span class="form-check-sign">
+                          <span class="check"></span>
+                        </span>
+                      </label>
+                    </div>`
+                    checkboxes.push(c)
+              })
+              input2 =
+                '<div class="col-sm-12 pb-3"><div class="form-group bmd-form-group is-filled"><label class="bmd-label-floating">' +
+                v +
+                '</label><br>'+checkboxes.join("")+'<br></div>';
+            }
             if (qv.upload) {
               input2 =
                 '<div class="col-sm-12"><div class=""><label class="bmd-label-floating">' +
@@ -745,6 +781,16 @@ function generateInputs(j, v, object, qv){
                 "[" +
                 v +
                 ']" class="form-control" ></div></div>';
+            }
+            if (qv.hidden) {
+              input2 =
+                '<input type="hidden" aria-label="' +
+                v +
+                '" name="' +
+                object +
+                "[" +
+                v +
+                ']"  >';
             }
           
         }

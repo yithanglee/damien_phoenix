@@ -43,9 +43,22 @@
 
   """
   def create_<%= schema.singular %>(attrs \\ %{}) do
+    a = 
     %<%= inspect schema.alias %>{}
     |> <%= inspect schema.alias %>.changeset(attrs)
     |> Repo.insert()
+  
+    case a do
+      {:ok, model} ->
+        WebAccWeb.Endpoint.broadcast("user:lobby", "model_update", %{
+          source: model.__meta__.source,
+          data: Utility.s_to_map(model)
+        })
+
+      _ ->
+        nil
+    end
+    a 
   end
 
   @doc """
@@ -61,9 +74,23 @@
 
   """
   def update_<%= schema.singular %>(%<%= inspect schema.alias %>{} = <%= schema.singular %>, attrs) do
+    a = 
     <%= schema.singular %>
     |> <%= inspect schema.alias %>.changeset(attrs)
     |> Repo.update()
+
+    case a do
+      {:ok, model} ->
+        WebAccWeb.Endpoint.broadcast("user:lobby", "model_update", %{
+          source: model.__meta__.source,
+          data: Utility.s_to_map(model)
+        })
+
+      _ ->
+        nil
+    end
+
+    a 
   end
 
   @doc """

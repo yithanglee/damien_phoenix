@@ -60,45 +60,76 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/core-js/2.4.1/core.js"></script>
   <!-- Library for adding dinamically elements -->
   <script src="/js/plugins/arrive.min.js"></script>
-  <!--  Google Maps Plugin    -->
+  <!--  Google Maps Plugin    
   <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_KEY_HERE"></script>
+  -->
   <!-- Chartist JS -->
   <script src="/js/plugins/chartist.min.js"></script>
   <!--  Notifications Plugin    -->
   <script src="/js/plugins/bootstrap-notify.js"></script>
   <!-- Control Center for Material Dashboard: parallax effects, scripts for the example pages etc -->
   <script src="/js/material-dashboard.js?v=2.1.0" type="text/javascript"></script>
+  <script src="/js/sha.js"></script>
+  <script src="/js/phoenix.js"></script>
+  <script type="text/javascript">
+    var socket = new Phoenix.Socket("/socket", {
+      params: { token: window.userToken }
+    });
+    socket.connect();
+    // Now that you are connected, you can join channels with a topic:
+    var topic = "user:lobby";
+    // Join the topic
+    let channel = socket.channel(topic, {});
+    channel
+      .join()
+
+      .receive("ok", (data) => {
+        console.log("Joined topic", topic);
+      })
+
+      .receive("error", (resp) => {
+        console.log("Unable to join topic", topic);
+      });
+  </script>
   <!--  Damien's Phoenix Form    -->
   <script src="/js/phoenix_form.js"></script>
 </head>
 
 <body>
   <div class="wrapper ">
-    <div class="sidebar" data-color="purple" data-background-color="white">
+    <div class="sidebar" data-color="orange" data-background-color="black">
       <!--
       Tip 1: You can change the color of the sidebar using: data-color="purple | azure | green | orange | danger"
 
       Tip 2: you can also add an image using data-image tag
   -->
       <div class="logo">
-        <a href="/" class="simple-text logo-mini">
+        <a href="/admin" class="simple-text logo-mini">
           MT
         </a>
-        <a href="/" class="simple-text logo-normal">
+        <a href="/admin" class="simple-text logo-normal">
           Material
         </a>
       </div>
       <div class="sidebar-wrapper">
-        <ul class="nav">
+        <ul class="nav" id="nav">
           <li class="nav-item active  ">
-            <a class="nav-link" href="#0">
+            <a class="nav-link" href="/admin/">
               <i class="material-icons">dashboard</i>
               <p>Dashboard</p>
+            </a>
+          </li>
+           <li class="nav-item  ">
+            <a class="nav-link" href="/admin/logout">
+              <i class="material-icons">dashboard</i>
+              <p>Logout</p>
             </a>
           </li>
           <!-- your sidebar here -->
         </ul>
       </div>
+<div class="sidebar-background" style="background-image: url('/img/sidebar-2.jpg');"></div>
+
     </div>
     <div class="main-panel">
       <!-- Navbar -->
@@ -196,6 +227,75 @@
       </div>
     </div>
   </div>
+  <script type="text/javascript">
+    $(document).ready(function() {
+      <%%= cond do %>
+        <%% get_flash(@conn, :info) != nil -> %>
+        
+      $.notify({
+        icon: "add_alert",
+        message: "<%%= get_flash(@conn, :info) %>"
+      }, {
+        type: "success",
+        timer: 1000,
+        placement: {
+          from: "top",
+          align: "center"
+        }
+      });
+        <%% get_flash(@conn, :error) != nil -> %>
+    
+
+      $.notify({
+        icon: "add_alert",
+        message: "<%%= get_flash(@conn, :error) %>"
+      }, {
+        type: "danger",
+        timer: 1000,
+        placement: {
+          from: "top",
+          align: "center"
+        }
+      });
+        <%% true -> %>
+        <%% end %>
+    })
+    $.ajax({url: "/images/uploads/menu.json"}).done(function(menus){
+      var m_list = []
+      $(menus).each((i,menu) => {
+        var li = `
+        <li class="nav-item  ">
+            <a class="nav-link" href="/admin`+menu.link+`">
+              <i class="material-icons">`+menu.icon+`</i>
+              <p>`+menu.name+`</p>
+            </a>
+          </li>`
+          m_list.push(li)
+
+      })
+
+
+      var navs = `
+          <li class="nav-item active  ">
+            <a class="nav-link" href="/admin/">
+              <i class="material-icons">dashboard</i>
+              <p>Dashboard</p>
+            </a>
+          </li>
+          `+m_list.join("")+`
+           <li class="nav-item  ">
+            <a class="nav-link" href="/admin/logout">
+              <i class="material-icons">dashboard</i>
+              <p>Logout</p>
+            </a>
+          </li>
+      `
+      $("#nav").html(navs)
+
+
+    })
+  </script>
+
 </body>
 
 </html>

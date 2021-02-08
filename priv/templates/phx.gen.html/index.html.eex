@@ -1,5 +1,12 @@
 <h2>Listing <%= schema.human_plural %></h2>
-
+<div class="tab-content tab-space tab-subcategories">
+  <div class="tab-pane active show" id="link7">
+    <div class="row">
+      <div class="col-lg-12" id="<%= schema.singular %>Dt">
+      </div>
+    </div>
+  </div>
+</div>
 <table class="table">
   <thead>
     <tr>
@@ -27,7 +34,7 @@
 
 <script type="text/javascript">
    var <%= schema.singular %>DataSources = {}
-    <%= schema.singular %>Source = new dataSource("<%= schema.table %>", {}, [], [
+    <%= schema.singular %>Source = new dataSource("<%= schema.table %>", {}, null, [
     <%= for {k, _} <- schema.attrs do %>{"label": "<%= Phoenix.Naming.humanize(Atom.to_string(k)) %>" , "data": "<%= k %>"},
     <% end %>
     {"label": "Action", "data": "id"}
@@ -40,11 +47,8 @@
         
       }
     }] );
-
-    <%= schema.singular %>Source.buttons = [{
-      iconName: "create", color: "warning", onClickFunction: editData, fnParams: { selector: "#myTable1", link:  "<%= schema.table %>", customCols: null,  module: "<%= inspect context.schema.alias %>"}
-    }]
-    <%= schema.singular %>Source.table = populateTable(<%= schema.singular %>Source)
-    dataSources["<%= schema.table %>"] = <%= schema.singular %>Source
-
+  
+    <%= schema.singular %>DataSources["<%= schema.table %>"] = <%= schema.singular %>Source
+  var dts = new dtSource(<%= schema.singular %>DataSources);
+  dts.populateTables("#<%= schema.singular %>Dt", "<%= schema.human_singular %> Management")
 </script>

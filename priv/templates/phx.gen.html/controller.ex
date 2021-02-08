@@ -3,7 +3,8 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
 
   alias <%= inspect context.module %>
   alias <%= inspect schema.module %>
-
+  alias <%= inspect context.base_module %>.{Repo}
+  import Ecto.Query
   def index(conn, params) do
     if Enum.any?(conn.path_info, fn x -> x == "api" end) do
       limit = String.to_integer(params["length"])

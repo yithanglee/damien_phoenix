@@ -1,5 +1,58 @@
 defmodule Utility do
-    require Decimal
+  require Decimal
+
+  def write_json(bin, filename) do
+    check = File.exists?(File.cwd!() <> "/media")
+    path =
+      if check do
+        File.cwd!() <> "/media"
+      else
+        File.mkdir(File.cwd!() <> "/media")
+        File.cwd!() <> "/media"
+      end
+
+    File.touch("#{path}/#{filename}")
+
+    File.write("#{path}/#{filename}", bin)
+  end
+
+  def upload_file(params) do
+    check_upload =
+      Map.values(params)
+      |> Enum.with_index()
+      |> Enum.filter(fn x -> is_map(elem(x, 0)) end)
+      |> Enum.filter(fn x -> elem(x, 0).__struct__ == Plug.Upload end)
+
+    if check_upload != [] do
+      file_plug = hd(check_upload) |> elem(0)
+      index = hd(check_upload) |> elem(1)
+
+      check = File.exists?(File.cwd!() <> "/media")
+
+      path =
+        if check do
+          File.cwd!() <> "/media"
+        else
+          File.mkdir(File.cwd!() <> "/media")
+          File.cwd!() <> "/media"
+        end
+
+      final =
+        if is_map(file_plug) do
+          IO.inspect(is_map(file_plug))
+          fl = String.replace(file_plug.filename, "'", "")
+          File.cp(file_plug.path, path <> "/#{fl}")
+          "/images/uploads/#{fl}"
+        else
+          "/images/uploads/#{file_plug}"
+        end
+
+      Map.put(params, Enum.at(Map.keys(params), index), final)
+    else
+      params
+    end
+  end
+
   def is_json(data) do
     if String.contains?(data, "\"") do
       case Jason.decode(data) do
@@ -41,6 +94,8 @@ defmodule Utility do
   end
 
   def s_to_map(struct, exclusion \\ []) do
+    module = struct.__meta__.schema |> Module.split() |> List.last()
+    exclusion = test_module(module) |> Map.keys()
     a = Map.from_struct(struct)
     d = Enum.filter(a, fn x -> Decimal.is_decimal(elem(x, 1)) end)
     c = Enum.filter(a, fn x -> is_number(elem(x, 1)) end)
@@ -88,7 +143,7 @@ defmodule Utility do
               {item, a[item] |> Date.to_string()}
 
             _ ->
-              if Decimal.decimal?(a[item]) do
+              if Decimal.is_decimal(a[item]) do
                 {item, a[item] |> Decimal.to_float()}
               else
                 if Timex.is_valid?(a[item]) do
