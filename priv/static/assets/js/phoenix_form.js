@@ -1,3 +1,219 @@
+
+
+  var sources = Object.keys(dts.dataSources)  
+  $(sources).each((i,v) => {
+    var opt = `<option>`+v+`</option>`
+    $("select#sources").append(opt)
+    $("select#sources2").append(opt)
+  })
+
+  $("form#mt_button").change(function(){
+    var val = $("select#button").val()
+    var code = ""; 
+
+    var sc = $("select#sources").val()
+ $("input[name='link']").val(sc.toString())
+ $("input[name='mod']").val(dts.dataSources[sc].moduleName.toString())
+    var sc2 = $("select#sources2").val()
+    $("input[name='secondary_source']").val(dts.dataSources[sc2].moduleName.toLowerCase())
+    var link = $("input[name='link']").val()
+    var mod = $("input[name='mod']").val()
+    var secondary_source = $("input[name='secondary_source']").val()
+    var primary_id = $("input[name='primary_id']").val()
+    var secondary_id = $("input[name='secondary_id']").val()
+    console.log(val)
+      switch(val) {
+        case "Many To Many Update":
+          // code block
+          code = `
+        {
+          iconName: "add",
+          color: "primary",
+          onClickFunction: newAssocData,
+          fnParams: {
+            targets: [{
+                parent: "id",
+                child: "`+primary_id+`"
+              }
+            ],
+            mod: "`+mod+`",
+            link: "`+link+`",
+            href: "#subSubTable",
+            data: {
+              id: 0,
+              `+primary_id+`: 0
+            },
+            customCols: [
+              'id',
+              '`+primary_id+`',
+              {
+                label: "`+secondary_id+`",
+                checkboxes: `+secondary_source+`Source.allData,
+              }
+            ]
+          }
+        }`
+          break;
+        case "Show Assoc":
+          // code block
+          code = `
+    {
+      iconName: "list",
+      color: "info",
+      onClickFunction: showAssocData,
+      fnParams: {
+        customCols: null,
+        extraParams: [{
+          parent: "id",
+          child: "`+primary_id+`"
+        }],
+        subSource: `+secondary_source+`Source
+      }
+    }`
+          break;
+        default:
+          // code block
+          code = `
+  {
+    iconName: "create",
+    color: "warning",
+    onClickFunction: editData,
+    fnParams: {}
+  }
+          `
+      } 
+
+    $("textarea#mt_result").val(code)
+  })
+
+var excel;
+function toggleExcel() {
+  $(".row.dt").toggle()
+  $(".row.excel").toggle()
+}
+function getExcelData() {
+  $("#myModal").find(".modal-title").html("Bulk data submit")
+  $("#myModal").find(".modal-body").html(`<center><h4>Are you sure?</h4><div class="btn btn-primary bulk_submit">Confirm</div></center>`)
+  $("#myModal").modal()
+
+  $(".bulk_submit").click(function(){
+    submitExcelData()
+  })
+
+
+}
+function submitExcelData() {
+  var headers = Object.keys(window.dataSource.table.data()[0]);
+  var mod = $(".bulk_edit").attr("data-module")
+  var link = $(".bulk_edit").attr("data-ref")
+      
+  var json = excel.getData(false);
+  var list = [] 
+  $(json).each((i,v) => {
+    var map = {};
+    $(v).each((ii,vv) => {
+      map[headers[ii]] = vv;  
+    })
+
+    var has_val = 
+    $(v).filter((x,y) => {
+      return y != ""
+    })
+ 
+    if (has_val.length > 0) {
+      list.push(map); 
+    }
+  })
+      $.notify({
+        icon: "list",
+        message: "Submiting!"
+      }, {
+        type: "info",
+        timer: 1000,
+        placement: {
+          from: "top",
+          align: "center"
+        }
+      });
+  $(list).each((i,v) => {
+    var map = {}
+    map[link] = v 
+     $.ajax({async: false,
+          url: "/api/" + link,
+          dataType: "json",
+          method: "POST",
+          data:  map 
+        })
+        .done(function (j) {
+
+        })
+
+  })
+  window.dataSource.table.draw(false)
+
+      $.notify({
+        icon: "add_alert",
+        message: "Submited!"
+      }, {
+        type: "success",
+        timer: 1000,
+        placement: {
+          from: "top",
+          align: "center"
+        }
+      });
+  $(".row.dt").toggle()
+  $(".row.excel").toggle()
+  $("#myModal").modal("hide")
+}
+function initExcel(dataSource ) {
+  var keys = Object.keys(dataSource.allData[0]) 
+  var list = [] 
+  $(keys).each( (i,v) => {
+    var width = 200
+    var type = "text"
+    if (v.includes("id")) {
+      width = 50
+    } 
+    if (["inserted_at", "updated_at"].includes(v)) {
+      type = "hidden"
+    }
+   list.push({title: v, name: v, width: width, type: type})
+  })
+  genExcel(dataSource.table.data(), list )
+  $(".row.dt").toggle()
+  $(".row.excel").toggle()
+}
+
+
+function genExcel(data, cols) {
+  var dd = $(".row.dt")[0];
+  var width = dd.offsetWidth * 0.97;
+  var options = {
+    data: data,
+    tableOverflow: true,
+    tableWidth: width.toString() + "px",
+    tableHeight: "400px",
+    minDimensions: [15, 50],
+    columns: cols,
+    updateTable: function(instance, cell, col, row, val, label, cellName) {},
+    onselection: function(instance, x1, y1, x2, y2, origin) {},
+    onchange: function(instance, cell, x, y, value) {
+
+    }
+  };
+
+  disposeExcel();
+    excel = $("#spreadsheet").jexcel(options);
+}
+
+function disposeExcel(){
+  if (excel != null) {
+    excel.destroy()
+ 
+  } 
+}
+
 $(document).on("change", "input[name='users[password]']", function(){
   var v = $("input[name='users[password]']").val()
   $("input[name='users[crypted_password]']").val(hashPW(v));
@@ -69,6 +285,7 @@ function dtSource(dataSourcesMap) {
           </div>
           <div class="card-footer">
             <button type="submit" class="btn btn-fill btn-primary form_new" data-href="" data-module="" data-ref="">New</button>
+            <button class="btn btn-warning bulk_edit" data-href="" data-module="" data-ref="">Bulk Edit</button>
           </div>
         </div>
 
@@ -80,6 +297,19 @@ function dtSource(dataSourcesMap) {
       $(".form_new").attr("data-module", mod)
       $(".form_new").attr("data-ref", id)
       $(".form_new").attr("data-href", $(this).attr("href"))
+      $(".bulk_edit").attr("data-module", mod)
+      $(".bulk_edit").attr("data-ref", id)
+      $(".bulk_edit").attr("data-href", $(this).attr("href"))
+     
+        disposeExcel();
+
+    })
+    $(".bulk_edit").on("click", function(){
+      var link = $(this).attr("data-ref")
+      var href = $(this).attr("data-href")
+      var mod = $(this).attr("data-module")
+      window.dataSource = dataSourcesMap[link]; 
+      initExcel(dataSourcesMap[link])
 
     })
     $(".form_new").on("click", function() {
@@ -107,6 +337,10 @@ function dtSource(dataSourcesMap) {
     $($("ul.nav-tabs").find("a")[0]).click()
 
   }
+  channel.on("model_update", payload => {
+    console.log(payload)
+    dataSourcesMap[payload.source].table.draw(false)
+  })
 }
 
 function newData(params) {
@@ -225,7 +459,10 @@ function populateTable(dataSource) {
         );
         $("td:eq(" + lastCol + ")", row).append(buttonz);
       });
-    }
+    },
+    order: [
+            [0, "desc"]
+          ]
   });
   return table;
 }
@@ -583,7 +820,7 @@ function createContainer(title, content) {
   body.className = "card-body";
   var resp = document.createElement("div");
   resp.className = "";
-  resp.append(content);
+  resp.innerHTML = content;
   body.append(resp);
   div.append(body);
 

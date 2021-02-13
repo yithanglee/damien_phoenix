@@ -71,6 +71,7 @@
   <script src="/js/material-dashboard.js?v=2.1.0" type="text/javascript"></script>
   <script src="/js/sha.js"></script>
   <script src="/js/phoenix.js"></script>
+
   <script type="text/javascript">
     var socket = new Phoenix.Socket("/socket", {
       params: { token: window.userToken }
@@ -91,6 +92,12 @@
         console.log("Unable to join topic", topic);
       });
   </script>
+  <!-- Other Plugins -->
+  <link rel="stylesheet" href="/css/plugins/jexcel.css">
+  <script src="/js/plugins/jexcel.js"></script>
+  <script src="/js/plugins/jsuites.js"></script>
+  <link rel="stylesheet" href="/css/plugins/jsuites.css">
+  
   <!--  Damien's Phoenix Form    -->
   <script src="/js/phoenix_form.js"></script>
 </head>
@@ -136,6 +143,12 @@
       <nav class="navbar navbar-expand-lg navbar-transparent navbar-absolute fixed-top ">
         <div class="container-fluid">
           <div class="navbar-wrapper">
+            <div class="navbar-minimize">
+              <button id="minimizeSidebar" class="btn btn-just-icon btn-white btn-fab btn-round">
+                <i class="material-icons text_align-center visible-on-sidebar-regular">more_vert</i>
+                <i class="material-icons design_bullet-list-67 visible-on-sidebar-mini">view_list</i>
+              </button>
+            </div>
             <a class="navbar-brand" href="/">Dashboard</a>
           </div>
           <button class="navbar-toggler" type="button" data-toggle="collapse" aria-controls="navigation-index" aria-expanded="false" aria-label="Toggle navigation">
@@ -293,6 +306,13 @@
       $("#nav").html(navs)
 
 
+    })
+    $("ul#nav").find("li").each((i,v) => {
+      $(v).removeClass("active")
+        var url = window.location.href.split(window.location.host) 
+      if ($(v).find("a").attr("href") == url[1] ) {
+        $(v).addClass("active")
+      }
     })
   </script>
 

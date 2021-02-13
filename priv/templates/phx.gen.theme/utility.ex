@@ -1,7 +1,31 @@
 defmodule Utility do
   require Decimal
 
+  def raw_sql(query, assignments \\ []) do
+    case Ecto.Adapters.SQL.query!(<%= project.name  %>.Repo, query, assignments) do
+      %Postgrex.Result{
+        columns: columns,
+        command: command,
+        connection_id: _id,
+        messages: messages,
+        num_rows: num_rows,
+        rows: rows
+      } ->
+        %{columns: columns, rows: rows}
+
+      _ ->
+        %{columns: [], rows: []}
+    end
+  end
+  
+  def map_assign_string_index(data \\ ["a", "b", "c", "d"]) do
+    keys = data |> Enum.with_index() |> Enum.map(fn x -> "a#{elem(x, 1)}" |> String.to_atom() end)
+
+    Enum.zip(keys, data) |> Enum.into(%{})
+  end
+
   def write_json(bin, filename) do
+  
     check = File.exists?(File.cwd!() <> "/media")
     path =
       if check do

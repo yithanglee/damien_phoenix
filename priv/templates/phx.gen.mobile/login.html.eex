@@ -1,0 +1,39 @@
+        <form action="/mobile/authenticate" method="post">
+            
+            <input type="hidden" name="_csrf_token" value="<%%= Phoenix.Controller.get_csrf_token %>">
+        <div data-card-height="cover" class="card">
+            <div class="card-center">
+
+                <div class="pl-5 pr-5">
+                    <h1 class="color-white text-center text-uppercase font-900 fa-4x">LOGIN</h1>
+                    <p class="color-highlight text-center font-12">
+                        Image or Infinite Background Effect
+                    </p>
+                    <div class="input-style input-light has-icon input-style-1 input-required">
+                        <i class="input-icon fa fa-user font-11"></i>
+                        <span>Username</span>
+                        <em>(required)</em>
+                        <input type="name" name="username" placeholder="Username">
+                    </div> 
+                    <div class="input-style input-light has-icon input-style-1 input-required mb-5">
+                        <i class="input-icon fa fa-lock font-11"></i>
+                        <span>Password</span>
+                        <em>(required)</em>
+                        <input type="password" name="password" placeholder="Password">
+                    </div>          
+
+                    <div class="d-flex mt-n4 mb-4">
+                        <div class="w-50 font-11 pb-2 color-white opacity-60 text-left"><a href="#" class="color-white">Create Account</a></div>
+                        <div class="w-50 font-11 pb-2 color-white opacity-60 text-right"><a href="#" class="color-white">Forgot Credentials</a></div>
+                    </div>
+
+                    <button type="submit" class="back-button btn btn-full btn-m shadow-large rounded-s text-uppercase font-900 bg-highlight">LOGIN</button>
+                    <div class="divider mt-3"></div>
+        
+                </div>
+
+            </div>
+            <div class="card-overlay bg-black opacity-85"></div>
+            <div class="card-overlay-infinite preload-img" data-src="/mobile/images/pictures/_bg-infinite.jpg"></div>
+        </div>
+                </form>

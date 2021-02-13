@@ -77,6 +77,14 @@ defmodule Mix.Tasks.Phx.Gen.Theme do
       material_app_ex,
       EEx.eval_file("#{app_dir}/priv/templates/layout/material_app.html.eex", project: project)
     )
+
+    material_blank_ex =
+      File.cwd!() <> "/lib/#{project.alias_name}_web/templates/layout" <> "/blank.html.eex"
+
+    Mix.Generator.create_file(
+      material_blank_ex,
+      EEx.eval_file("#{app_dir}/priv/templates/layout/material_blank.html.eex", project: project)
+    )
   end
 
   def material_login(app_dir, project) do

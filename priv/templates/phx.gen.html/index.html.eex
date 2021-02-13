@@ -1,36 +1,22 @@
-<h2>Listing <%= schema.human_plural %></h2>
 <div class="tab-content tab-space tab-subcategories">
-  <div class="tab-pane active show" id="link7">
+  <div class="tab-pane active show" id="link0">
     <div class="row">
       <div class="col-lg-12" id="<%= schema.singular %>Dt">
+      </div>
+      <div class="row excel" style="display: none;">
+          <div class="col-lg-12" id="spreadsheet">
+            
+          </div>
+          <div class="col-lg-1" >
+              <div class="btn btn-warning" onclick="getExcelData()">Submit</div>
+          </div>
+          <div class="col-lg-1" >
+              <div class="btn btn-default" onclick="toggleExcel()">Back</div>
+          </div>
       </div>
     </div>
   </div>
 </div>
-<table class="table">
-  <thead>
-    <tr>
-<%= for {k, _} <- schema.attrs do %>      <th><%= Phoenix.Naming.humanize(Atom.to_string(k)) %></th>
-<% end %>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-<%%= for <%= schema.singular %> <- @<%= schema.plural %> do %>
-    <tr>
-<%= for {k, _} <- schema.attrs do %>      <td><%%= <%= schema.singular %>.<%= k %> %></td>
-<% end %>
-      <td class="text-right">
-        <span><%%= link "Show", to: Routes.<%= schema.route_helper %>_path(@conn, :show, <%= schema.singular %>), class: "btn btn-default btn-xs" %></span>
-        <span><%%= link "Edit", to: Routes.<%= schema.route_helper %>_path(@conn, :edit, <%= schema.singular %>), class: "btn btn-default btn-xs" %></span>
-        <span><%%= link "Delete", to: Routes.<%= schema.route_helper %>_path(@conn, :delete, <%= schema.singular %>), method: :delete, data: [confirm: "Are you sure?"], class: "btn btn-danger btn-xs" %></span>
-      </td>
-    </tr>
-<%% end %>
-  </tbody>
-</table>
-
-<span><%%= link "New <%= schema.human_singular %>", to: Routes.<%= schema.route_helper %>_path(@conn, :new) %></span>
 
 <script type="text/javascript">
    var <%= schema.singular %>DataSources = {}
