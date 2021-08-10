@@ -41,6 +41,9 @@ defmodule Phoenix.Controller do
     * `:log` - the level to log. When false, disables controller
       logging
 
+    * `:put_default_views` - controls whether the default view
+      and layout should be set or not
+
   ## Connection
 
   A controller by default provides many convenience functions for
@@ -167,8 +170,10 @@ defmodule Phoenix.Controller do
 
       use Phoenix.Controller.Pipeline, opts
 
-      plug :put_new_layout, {Phoenix.Controller.__layout__(__MODULE__, opts), :app}
-      plug :put_new_view, Phoenix.Controller.__view__(__MODULE__)
+      if Keyword.get(opts, :put_default_views, true) do
+        plug :put_new_layout, {Phoenix.Controller.__layout__(__MODULE__, opts), :app}
+        plug :put_new_view, Phoenix.Controller.__view__(__MODULE__)
+      end
     end
   end
 
@@ -227,7 +232,7 @@ defmodule Phoenix.Controller do
       end
   """
   defmacro action_fallback(plug) do
-    Phoenix.Controller.Pipeline.__action_fallback__(plug)
+    Phoenix.Controller.Pipeline.__action_fallback__(plug, __CALLER__)
   end
 
   @doc """
@@ -381,6 +386,10 @@ defmodule Phoenix.Controller do
 
   For security, `:to` only accepts paths. Use the `:external`
   option to redirect to any URL.
+
+  The response will be sent with the status code defined within
+  the connection, via `Plug.Conn.put_status/2`. If no status
+  code is set, a 302 response is sent.
 
   ## Examples
 
@@ -728,14 +737,14 @@ defmodule Phoenix.Controller do
       raise "cannot render template #{inspect template} because conn.params[\"_format\"] is not set. " <>
             "Please set `plug :accepts, ~w(html json ...)` in your pipeline."
 
-    instrument_render_and_send(conn, format, template, assigns)
+    render_and_send(conn, format, template, assigns)
   end
 
   def render(conn, template, assigns)
       when is_binary(template) and (is_map(assigns) or is_list(assigns)) do
     case Path.extname(template) do
       "." <> format ->
-        instrument_render_and_send(conn, format, template, assigns)
+        render_and_send(conn, format, template, assigns)
       "" ->
         raise "cannot render template #{inspect template} without format. Use an atom if the " <>
               "template format is meant to be set dynamically based on the request format"
@@ -748,19 +757,7 @@ defmodule Phoenix.Controller do
     render(conn, view, template, [])
   end
 
-  @doc """
-  WARNING: This function is deprecated in favor of `render/3` + `put_view/2`.
-
-  A shortcut that renders the given template in the given view.
-
-  Equivalent to:
-
-      conn
-      |> put_view(view)
-      |> render(template, assigns)
-
-  """
-  @spec render(Plug.Conn.t, atom, atom | binary, Keyword.t | map) :: Plug.Conn.t
+  @doc false
   def render(conn, view, template, assigns)
       when is_atom(view) and (is_binary(template) or is_atom(template)) do
     IO.warn "#{__MODULE__}.render/4 with a view is deprecated, see the documentation for render/3 for an alternative"
@@ -769,31 +766,18 @@ defmodule Phoenix.Controller do
     |> render(template, assigns)
   end
 
-  @doc false
-  def __put_render__(conn, view, template, format, assigns) do
-    content_type = MIME.type(format)
-    conn = prepare_assigns(conn, assigns, template, format)
-    data = render_with_layouts(conn, view, template, format)
-
-    conn
-    |> ensure_resp_content_type(content_type)
-    |> resp(conn.status || 200, data)
-  end
-
-  defp instrument_render_and_send(conn, format, template, assigns) do
+  defp render_and_send(conn, format, template, assigns) do
     template = template_name(template, format)
     view =
       Map.get(conn.private, :phoenix_view) ||
         raise "a view module was not specified, set one with put_view/2"
 
-    metadata = %{view: view, template: template, format: format, conn: conn}
+    conn = prepare_assigns(conn, assigns, template, format)
+    data = render_with_layouts(conn, view, template, format)
 
-    conn =
-      Phoenix.Endpoint.instrument(conn, :phoenix_controller_render, metadata, fn ->
-        __put_render__(conn, view, template, format, assigns)
-      end)
-
-    send_resp(conn)
+    conn
+    |> ensure_resp_content_type(MIME.type(format))
+    |> send_resp(conn.status || 200, data)
   end
 
   defp render_with_layouts(conn, view, template, format) do
@@ -862,7 +846,7 @@ defmodule Phoenix.Controller do
   end
 
   @doc """
-  Puts the URL or `%URI{}` to be used for route generation.
+  Puts the url string or `%URI{}` to be used for route generation.
 
   This function overrides the default URL generation pulled
   from the `%Plug.Conn{}`'s endpoint configuration.
@@ -880,8 +864,8 @@ defmodule Phoenix.Controller do
 
   Now when you call `Routes.some_route_url(conn, ...)`, it will use
   the router url set above. Keep in mind that, if you want to generate
-  routes to the current domain, it is preferred to use `Routes.some_route_path`
-  helpers, as those are always relative.
+  routes to the *current* domain, it is preferred to use
+  `Routes.some_route_path` helpers, as those are always relative.
   """
   def put_router_url(conn, %URI{} = uri) do
     put_private(conn, :phoenix_router_url, uri)
@@ -907,12 +891,22 @@ defmodule Phoenix.Controller do
   @doc """
   Puts the format in the connection.
 
+  This format is used when rendering a template as an atom.
+  For example, `render(conn, :foo)` will render `"foo.FORMAT"`
+  where the format is the one set here. The default format
+  is typically set from the negotiation done in `accepts/2`.
+
   See `get_format/1` for retrieval.
   """
   def put_format(conn, format), do: put_private(conn, :phoenix_format, format)
 
   @doc """
   Returns the request format, such as "json", "html".
+
+  This format is used when rendering a template as an atom.
+  For example, `render(conn, :foo)` will render `"foo.FORMAT"`
+  where the format is the one set here. The default format
+  is typically set from the negotiation done in `accepts/2`.
   """
   def get_format(conn) do
     conn.private[:phoenix_format] || conn.params["_format"]
@@ -949,6 +943,11 @@ defmodule Phoenix.Controller do
       Defaults to none
     * `:offset` - the bytes to offset when reading. Defaults to `0`
     * `:length` - the total bytes to read. Defaults to `:all`
+    * `:encode` - encodes the filename using `URI.encode_www_form/1`.
+      Defaults to `true`. When `false`, disables encoding. If you
+      disable encoding, you need to guarantee there are no special
+      characters in the filename, such as quotes, newlines, etc.
+      Otherwise you can expose your application to security attacks
 
   ## Examples
 
@@ -1105,6 +1104,10 @@ defmodule Phoenix.Controller do
       control attacks
 
   A custom headers map may also be given to be merged with defaults.
+  It is recommended for custom header keys to be in lowercase, to avoid sending
+  duplicate keys in a request.
+  Additionally, responses with mixed-case headers served over HTTP/2 are not
+  considered valid by common clients, resulting in dropped responses.
   """
   def put_secure_browser_headers(conn, headers \\ %{})
   def put_secure_browser_headers(conn, []) do
@@ -1153,6 +1156,14 @@ defmodule Phoenix.Controller do
   considered to be the format desired by the client. If no
   "_format" parameter is available, this function will parse
   the "accept" header and find a matching format accordingly.
+
+  This function is useful when you may want to serve different
+  content-types (such as JSON and HTML) from the same routes.
+  However, if you always have distinct routes, you can also
+  disable content negotiation and simply hardcode your format
+  of choice in your route pipelines:
+
+      plug :put_format, "html"
 
   It is important to notice that browsers have historically
   sent bad accept headers. For this reason, this function will
@@ -1399,7 +1410,7 @@ defmodule Phoenix.Controller do
   end
 
   @doc """
-  Returns a message from flash by `key`.
+  Returns a message from flash by `key` (or `nil` if no message is available for `key`).
 
   ## Examples
 
@@ -1448,12 +1459,26 @@ defmodule Phoenix.Controller do
   end
 
   @doc """
-  Returns the current request path, with and without query params.
+  Returns the current request path with its default query parameters:
 
-  By default, the connection's query params are included in
-  the generated path. Custom query params may be used instead
-  by providing a map of your own params. You may also retrieve
-  only the request path by passing an empty map of params.
+      iex> current_path(conn)
+      "/users/123?existing=param"
+
+  See `current_path/2` to override the default parameters.
+  """
+  def current_path(%Plug.Conn{query_string: ""} = conn) do
+    conn.request_path
+  end
+
+  def current_path(%Plug.Conn{query_string: query_string} = conn) do
+    conn.request_path <> "?" <> query_string
+  end
+
+  @doc """
+  Returns the current path with the given query parameters.
+
+  You may also retrieve only the request path by passing an
+  empty map of params.
 
   ## Examples
 
@@ -1470,12 +1495,6 @@ defmodule Phoenix.Controller do
       "/users/123"
 
   """
-  def current_path(%Plug.Conn{query_string: ""} = conn) do
-    conn.request_path
-  end
-  def current_path(%Plug.Conn{query_string: query_string} = conn) do
-    conn.request_path <> "?" <> query_string
-  end
   def current_path(%Plug.Conn{} = conn, params) when params == %{} do
     conn.request_path
   end
@@ -1496,7 +1515,7 @@ defmodule Phoenix.Controller do
   end
 
   @doc ~S"""
-  Returns the current request URL, with and without query params.
+  Returns the current request URL with query params.
 
   The path will be retrieved from the currently requested path via
   `current_path/1`. The scheme, host and others will be received from
@@ -1536,7 +1555,7 @@ defmodule Phoenix.Controller do
       end
 
   However, if you want all generated URLs to always have a certain schema,
-  host, etc, you may invoke `put_router_url/2`.
+  host, etc, you may use `put_router_url/2`.
   """
   def current_url(%Plug.Conn{} = conn, %{} = params) do
     Phoenix.Router.Helpers.url(router_module(conn), conn) <> current_path(conn, params)

@@ -9,6 +9,8 @@ defmodule Phoenix.Endpoint.RenderErrors do
   #
   #   * `:view` - the name of the view we render templates against
   #   * `:format` - the format to use when none is available from the request
+  #   * `:accepts` - list of accepted formats errors will be rendered for
+  #   * `:log` - the `t:Logger.level/0` or `false` to disable logging rendered errors
   #
   @moduledoc false
 
@@ -44,7 +46,7 @@ defmodule Phoenix.Endpoint.RenderErrors do
             unquote(__MODULE__).__catch__(conn, kind, reason, stack, @phoenix_render_errors)
         catch
           kind, reason ->
-            stack = System.stacktrace()
+            stack = __STACKTRACE__
             unquote(__MODULE__).__catch__(conn, kind, reason, stack, @phoenix_render_errors)
         end
       end
@@ -66,19 +68,14 @@ defmodule Phoenix.Endpoint.RenderErrors do
   end
 
   defp instrument_render_and_send(conn, kind, reason, stack, opts) do
-    level = Keyword.get(opts, :log, :info)
+    level = Keyword.get(opts, :log, :debug)
     status = status(kind, reason)
     conn = error_conn(conn, kind, reason)
     start = System.monotonic_time()
-    metadata = %{status: status, conn: conn, kind: kind, reason: reason, stacktrace: stack, log: level}
+    metadata = %{conn: conn, status: status, kind: kind, reason: reason, stacktrace: stack, log: level}
 
     try do
-      conn =
-        Phoenix.Endpoint.instrument(conn, :phoenix_error_render, metadata, fn ->
-          render(conn, status, kind, reason, stack, opts)
-        end)
-
-      send_resp(conn)
+      render(conn, status, kind, reason, stack, opts)
     after
       duration = System.monotonic_time() - start
       :telemetry.execute([:phoenix, :error_rendered], %{duration: duration}, metadata)
@@ -115,7 +112,9 @@ defmodule Phoenix.Endpoint.RenderErrors do
     template = "#{conn.status}.#{format}"
     assigns = %{kind: kind, reason: reason, stack: stack, status: conn.status}
 
-    Controller.__put_render__(conn, view, template, format, assigns)
+    conn
+    |> Controller.put_view(view)
+    |> Controller.render(template, assigns)
   end
 
   defp maybe_fetch_query_params(conn) do

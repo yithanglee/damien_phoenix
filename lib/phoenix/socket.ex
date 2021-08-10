@@ -13,12 +13,12 @@ defmodule Phoenix.Socket do
   By default, Phoenix supports both websockets and longpoll when invoking
   `Phoenix.Endpoint.socket/3` in your endpoint:
 
-      socket "/socket", MyApp.Socket, websocket: true, longpoll: false
+      socket "/socket", MyAppWeb.Socket, websocket: true, longpoll: false
 
   The command above means incoming socket connections can be made via
   a WebSocket connection. Events are routed by topic to channels:
 
-      channel "room:lobby", MyApp.LobbyChannel
+      channel "room:lobby", MyAppWeb.LobbyChannel
 
   See `Phoenix.Channel` for more information on channels.
 
@@ -36,10 +36,10 @@ defmodule Phoenix.Socket do
 
   ## Examples
 
-      defmodule MyApp.UserSocket do
+      defmodule MyAppWeb.UserSocket do
         use Phoenix.Socket
 
-        channel "room:*", MyApp.RoomChannel
+        channel "room:*", MyAppWeb.RoomChannel
 
         def connect(params, socket, _connect_info) do
           {:ok, assign(socket, :user_id, params["user_id"])}
@@ -49,7 +49,7 @@ defmodule Phoenix.Socket do
       end
 
       # Disconnect all user's socket connections and their multiplexed channels
-      MyApp.Endpoint.broadcast("users_socket:" <> user.id, "disconnect", %{})
+      MyAppWeb.Endpoint.broadcast("users_socket:" <> user.id, "disconnect", %{})
 
   ## Socket fields
 
@@ -57,8 +57,8 @@ defmodule Phoenix.Socket do
     * `:assigns` - The map of socket assigns, default: `%{}`
     * `:channel` - The current channel module
     * `:channel_pid` - The channel pid
-    * `:endpoint` - The endpoint module where this socket originated, for example: `MyApp.Endpoint`
-    * `:handler` - The socket module where this socket originated, for example: `MyApp.UserSocket`
+    * `:endpoint` - The endpoint module where this socket originated, for example: `MyAppWeb.Endpoint`
+    * `:handler` - The socket module where this socket originated, for example: `MyAppWeb.UserSocket`
     * `:joined` - If the socket has effectively joined the channel
     * `:join_ref` - The ref sent by the client when joining
     * `:ref` - The latest ref sent by the client
@@ -68,13 +68,16 @@ defmodule Phoenix.Socket do
     * `:transport_pid` - The pid of the socket's transport process
     * `:serializer` - The serializer for socket messages
 
-  ## Logging
+  ## Using options
 
-  Logging for socket connections is set via the `:log` option, for example:
+  On `use Phoenix.Socket`, the following options are accepted:
 
-      use Phoenix.Socket, log: :debug
+    * `:log` - the default level to log socket actions. Defaults
+      to `:info`. May be set to `false` to disable it
 
-  Defaults to the `:info` log level. Pass `false` to disable logging.
+    * `:partitions` - each channel is spawned under a supervisor.
+      This option controls how many supervisors will be spawned
+      to handle channels. Defaults to the number of cores.
 
   ## Garbage collection
 
@@ -126,9 +129,14 @@ defmodule Phoenix.Socket do
   ## Custom channels
 
   You can list any module as a channel as long as it implements
-  a `start_link/1` function that receives a tuple with three elements:
+  a `child_spec/1` function. The `child_spec/1` function receives
+  the caller as argument and it must return a child spec that
+  initializes a process.
 
-      {auth_payload, from, socket}
+  Once the process is initialized, it will receive the following
+  message:
+
+      {Phoenix.Channel, auth_payload, from, socket}
 
   A custom channel implementation MUST invoke
   `GenServer.reply(from, {:ok | :error, reply_payload})` during its
@@ -171,11 +179,6 @@ defmodule Phoenix.Socket do
   Custom channel implementations cannot be tested with `Phoenix.ChannelTest`
   and are currently considered experimental. The underlying API may be
   changed at any moment.
-
-  **Note:** in future Phoenix versions we will require custom channels
-  to provide a custom `child_spec/1` function instead of `start_link/1`.
-  Since the default behaviour of `child_spec/1` is to invoke `start_link/1`,
-  this behaviour should be backwards compatible in almost all cases.
   """
 
   require Logger
@@ -213,7 +216,7 @@ defmodule Phoenix.Socket do
   Would allow you to broadcast a `"disconnect"` event and terminate
   all active sockets and channels for a given user:
 
-      MyApp.Endpoint.broadcast("users_socket:" <> user.id, "disconnect", %{})
+      MyAppWeb.Endpoint.broadcast("users_socket:" <> user.id, "disconnect", %{})
 
   Returning `nil` makes this socket anonymous.
   """
@@ -269,8 +272,7 @@ defmodule Phoenix.Socket do
       @behaviour Phoenix.Socket
       @before_compile Phoenix.Socket
       Module.register_attribute(__MODULE__, :phoenix_channels, accumulate: true)
-      @phoenix_transports %{}
-      @phoenix_log Keyword.get(unquote(opts), :log, :info)
+      @phoenix_socket_options unquote(opts)
 
       ## Callbacks
 
@@ -278,11 +280,11 @@ defmodule Phoenix.Socket do
 
       @doc false
       def child_spec(opts) do
-        Phoenix.Socket.__child_spec__(__MODULE__, opts)
+        Phoenix.Socket.__child_spec__(__MODULE__, opts, @phoenix_socket_options)
       end
 
       @doc false
-      def connect(map), do: Phoenix.Socket.__connect__(__MODULE__, map, @phoenix_log)
+      def connect(map), do: Phoenix.Socket.__connect__(__MODULE__, map, @phoenix_socket_options)
 
       @doc false
       def init(state), do: Phoenix.Socket.__init__(state)
@@ -326,7 +328,7 @@ defmodule Phoenix.Socket do
 
     * `topic_pattern` - The string pattern, for example `"room:*"`, `"users:*"`,
       or `"system"`
-    * `module` - The channel module handler, for example `MyApp.RoomChannel`
+    * `module` - The channel module handler, for example `MyAppWeb.RoomChannel`
     * `opts` - The optional list of options, see below
 
   ## Options
@@ -367,108 +369,14 @@ defmodule Phoenix.Socket do
   end
   defp tear_alias(other), do: other
 
-  # TODO: Remove the transport/3 implementation on v1.5
-  # but we should keep the warning for backwards compatibility.
-
   @doc false
-  defmacro transport(name, module, config \\ []) do
-    quote do
-      @phoenix_transports Phoenix.Socket.__transport__(
-        @phoenix_transports, unquote(name), unquote(module), unquote(config))
-    end
+  @deprecated "transport/3 in Phoenix.Socket is deprecated and has no effect"
+  defmacro transport(_name, _module, _config \\ []) do
+    :ok
   end
-
-  @doc false
-  def __transport__(transports, name, module, user_conf) do
-    IO.warn """
-    transport/3 in Phoenix.Socket is deprecated.
-
-    Instead of defining transports in your socket.ex file:
-
-        transport :websocket, Phoenix.Transport.Websocket,
-          key1: value1, key2: value2, key3: value3
-
-        transport :longpoll, Phoenix.Transport.LongPoll,
-          key1: value1, key2: value2, key3: value3
-
-    You should configure websocket/longpoll in your endpoint.ex:
-
-        socket "/socket", MyApp.UserSocket,
-          websocket: [key1: value1, key2: value2, key3: value3],
-          longpoll: [key1: value1, key2: value2, key3: value3]
-
-    Note the websocket/longpoll configuration given to socket/3
-    will only apply after you remove all transport/3 calls from
-    your socket definition. If you have explicitly upgraded to
-    Cowboy 2, any transport defined with the transport/3 macro
-    will be ignored.
-    """
-
-    defaults = module.default_config()
-
-    conf =
-      user_conf
-      |> normalize_serializer_conf(name, module, defaults[:serializer] || [])
-      |> merge_defaults(defaults)
-
-    Map.update(transports, name, {module, conf}, fn {dup_module, _} ->
-      raise ArgumentError,
-        "duplicate transports (#{inspect dup_module} and #{inspect module}) defined for #{inspect name}"
-    end)
-  end
-  defp merge_defaults(conf, defaults), do: Keyword.merge(defaults, conf)
-
-  defp normalize_serializer_conf(conf, name, transport_mod, default) do
-    update_in(conf[:serializer], fn
-      nil ->
-        precompile_serializers(default)
-
-      Phoenix.Transports.LongPollSerializer = serializer ->
-        warn_serializer_deprecation(name, transport_mod, serializer)
-        precompile_serializers(default)
-
-      Phoenix.Transports.WebSocketSerializer = serializer ->
-        warn_serializer_deprecation(name, transport_mod, serializer)
-        precompile_serializers(default)
-
-      [_ | _] = serializer ->
-        precompile_serializers(serializer)
-
-      serializer when is_atom(serializer) ->
-        warn_serializer_deprecation(name, transport_mod, serializer)
-        precompile_serializers([{serializer, "~> 1.0.0"}])
-    end)
-  end
-
-  defp warn_serializer_deprecation(name, transport_mod, serializer) do
-    IO.warn """
-    passing a serializer module to the transport macro is deprecated.
-    Use a list with version requirements instead. For example:
-
-        transport :#{name}, #{inspect transport_mod},
-          serializer: [{#{inspect serializer}, "~> 1.0.0"}]
-
-    """
-  end
-
-  defp precompile_serializers(serializers) do
-    for {module, requirement} <- serializers do
-      case Version.parse_requirement(requirement) do
-        {:ok, requirement} -> {rewrite_serializer(module), requirement}
-        :error -> Version.match?("1.0.0", requirement)
-      end
-    end
-  end
-
-  defp rewrite_serializer(Phoenix.Transports.V2.WebSocketSerializer), do: Phoenix.Socket.V2.JSONSerializer
-  defp rewrite_serializer(Phoenix.Transports.V2.LongPollSerializer), do: Phoenix.Socket.V2.JSONSerializer
-  defp rewrite_serializer(Phoenix.Transports.WebSocketSerializer), do: Phoenix.Socket.V1.JSONSerializer
-  defp rewrite_serializer(Phoenix.Transports.LongPollSerializer), do: Phoenix.Socket.V1.JSONSerializer
-  defp rewrite_serializer(module), do: module
 
   defmacro __before_compile__(env) do
-    transports = Module.get_attribute(env.module, :phoenix_transports)
-    channels   = Module.get_attribute(env.module, :phoenix_channels)
+    channels = Module.get_attribute(env.module, :phoenix_channels)
 
     channel_defs =
       for {topic_pattern, module, opts} <- channels do
@@ -478,7 +386,6 @@ defmodule Phoenix.Socket do
       end
 
     quote do
-      def __transports__, do: unquote(Macro.escape(transports))
       unquote(channel_defs)
       def __channel__(_topic), do: nil
     end
@@ -500,19 +407,15 @@ defmodule Phoenix.Socket do
 
   ## CALLBACKS IMPLEMENTATION
 
-  def __child_spec__(handler, opts) do
-    import Supervisor.Spec
+  def __child_spec__(handler, opts, socket_options) do
     endpoint = Keyword.fetch!(opts, :endpoint)
-    shutdown = Keyword.get(opts, :shutdown, 5_000)
-    partitions = Keyword.get(opts, :partitions) || System.schedulers_online()
-
-    worker_opts = [shutdown: shutdown, restart: :temporary]
-    worker = worker(Phoenix.Channel.Server, [], worker_opts)
-    args = {endpoint, handler, partitions, worker}
-    supervisor(Phoenix.Socket.PoolSupervisor, [args], id: handler)
+    opts = Keyword.merge(socket_options, opts)
+    partitions = Keyword.get(opts, :partitions, System.schedulers_online())
+    args = {endpoint, handler, partitions}
+    Supervisor.child_spec({Phoenix.Socket.PoolSupervisor, args}, id: handler)
   end
 
-  def __connect__(user_socket, map, log) do
+  def __connect__(user_socket, map, socket_options) do
     %{
       endpoint: endpoint,
       options: options,
@@ -522,34 +425,33 @@ defmodule Phoenix.Socket do
     } = map
 
     vsn = params["vsn"] || "1.0.0"
+
+    options = Keyword.merge(socket_options, options)
     start = System.monotonic_time()
-    runtime = Map.merge(map, %{vsn: vsn, user_socket: user_socket, log: log})
 
-    Phoenix.Endpoint.instrument(endpoint, :phoenix_socket_connect, runtime, fn ->
-      case negotiate_serializer(Keyword.fetch!(options, :serializer), vsn) do
-        {:ok, serializer} ->
-          result = user_connect(user_socket, endpoint, transport, serializer, params, connect_info)
+    case negotiate_serializer(Keyword.fetch!(options, :serializer), vsn) do
+      {:ok, serializer} ->
+        result = user_connect(user_socket, endpoint, transport, serializer, params, connect_info)
 
-          metadata = %{
-            endpoint: endpoint,
-            transport: transport,
-            params: params,
-            connect_info: connect_info,
-            vsn: vsn,
-            user_socket: user_socket,
-            log: log,
-            result: result(result),
-            serializer: serializer
-          }
+        metadata = %{
+          endpoint: endpoint,
+          transport: transport,
+          params: params,
+          connect_info: connect_info,
+          vsn: vsn,
+          user_socket: user_socket,
+          log: Keyword.get(options, :log, :info),
+          result: result(result),
+          serializer: serializer
+        }
 
-          duration = System.monotonic_time() - start
-          :telemetry.execute([:phoenix, :socket_connected], %{duration: duration}, metadata)
-          result
+        duration = System.monotonic_time() - start
+        :telemetry.execute([:phoenix, :socket_connected], %{duration: duration}, metadata)
+        result
 
-        :error ->
-          :error
-      end
-    end)
+      :error ->
+        :error
+    end
   end
 
   defp result({:ok, _}), do: :ok
@@ -589,8 +491,7 @@ defmodule Phoenix.Socket do
       %{^pid => {topic, join_ref}} ->
         {^pid, monitor_ref} = Map.fetch!(state.channels, topic)
         state = delete_channel(state, pid, topic, monitor_ref)
-        {:socket_push, opcode, payload} = serialize_close(socket, topic, join_ref)
-        {:push, {opcode, payload}, {state, socket}}
+        {:push, encode_close(socket, topic, join_ref), {state, socket}}
 
       %{} ->
         {:ok, {state, socket}}
@@ -632,15 +533,34 @@ defmodule Phoenix.Socket do
   end
 
   defp user_connect(handler, endpoint, transport, serializer, params, connect_info) do
-    # The information in the Phoenix.Socket goes to userland and channels.
-    socket = %Socket{
-      handler: handler,
-      endpoint: endpoint,
-      pubsub_server: endpoint.__pubsub_server__,
-      serializer: serializer,
-      transport: transport
-    }
+    if pubsub_server = endpoint.config(:pubsub_server) do
+      # The information in the Phoenix.Socket goes to userland and channels.
+      socket = %Socket{
+        handler: handler,
+        endpoint: endpoint,
+        pubsub_server: pubsub_server,
+        serializer: serializer,
+        transport: transport
+      }
 
+      user_connect(handler, params, socket, connect_info)
+    else
+      Logger.error """
+      The :pubsub_server was not configured for endpoint #{inspect(endpoint)}.
+      Make sure to start a PubSub proccess in your application supervision tree:
+
+          {Phoenix.PubSub, [name: YOURAPP.PubSub, adapter: Phoenix.PubSub.PG2]}
+
+      And then list it your endpoint config:
+
+          pubsub_server: YOURAPP.PubSub
+      """
+
+      :error
+    end
+  end
+
+  defp user_connect(handler, params, socket, connect_info) do
     # The information in the state is kept only inside the socket process.
     state = %{
       channels: %{},
@@ -691,17 +611,17 @@ defmodule Phoenix.Socket do
     {:reply, :ok, encode_reply(socket, reply), {state, socket}}
   end
 
-  defp handle_in(nil, %{event: "phx_join", topic: topic, ref: ref} = message, state, socket) do
+  defp handle_in(nil, %{event: "phx_join", topic: topic, ref: ref, join_ref: join_ref} = message, state, socket) do
     case socket.handler.__channel__(topic) do
       {channel, opts} ->
         case Phoenix.Channel.Server.join(socket, channel, message, opts) do
           {:ok, reply, pid} ->
-            reply = %Reply{join_ref: ref, ref: ref, topic: topic, status: :ok, payload: reply}
-            state = put_channel(state, pid, topic, ref)
+            reply = %Reply{join_ref: join_ref, ref: ref, topic: topic, status: :ok, payload: reply}
+            state = put_channel(state, pid, topic, join_ref)
             {:reply, :ok, encode_reply(socket, reply), {state, socket}}
 
           {:error, reply} ->
-            reply = %Reply{join_ref: ref, ref: ref, topic: topic, status: :error, payload: reply}
+            reply = %Reply{join_ref: join_ref, ref: ref, topic: topic, status: :error, payload: reply}
             {:reply, :error, encode_reply(socket, reply), {state, socket}}
         end
 
@@ -717,16 +637,6 @@ defmodule Phoenix.Socket do
     end
 
     :ok = shutdown_duplicate_channel(pid)
-
-    # We have to send a message to the client because the client
-    # may be expecting us to explicitly shutdown previous channels,
-    # even when they are duplicate. Instead, we would prefer for
-    # the client to automatically handle this, but that was not the
-    # case up to Phoenix v1.4.0.
-    # TODO: Remove this message on Phoenix v1.5+
-    {^topic, join_ref} = Map.fetch!(state.channels_inverse, pid)
-    send self(), serialize_close(socket, topic, join_ref)
-
     state = delete_channel(state, pid, topic, ref)
     handle_in(nil, message, state, socket)
   end
@@ -736,13 +646,15 @@ defmodule Phoenix.Socket do
     {:ok, {state, socket}}
   end
 
-  defp handle_in(nil, %{event: "phx_leave", ref: ref, topic: topic}, state, socket) do
+  defp handle_in(nil, %{event: "phx_leave", ref: ref, topic: topic, join_ref: join_ref}, state, socket) do
     reply = %Reply{
       ref: ref,
+      join_ref: join_ref,
       topic: topic,
       status: :ok,
       payload: %{}
     }
+
     {:reply, :ok, encode_reply(socket, reply), {state, socket}}
   end
 
@@ -788,9 +700,9 @@ defmodule Phoenix.Socket do
     {opcode, payload}
   end
 
-  defp serialize_close(%{serializer: serializer}, topic, join_ref) do
+  defp encode_close(socket, topic, join_ref) do
     message = %Message{join_ref: join_ref, ref: join_ref, topic: topic, event: "phx_close", payload: %{}}
-    serializer.encode!(message)
+    encode_reply(socket, message)
   end
 
   defp shutdown_duplicate_channel(pid) do

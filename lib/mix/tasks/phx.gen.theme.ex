@@ -19,74 +19,6 @@ defmodule Mix.Tasks.Phx.Gen.Theme do
     run_args()
   end
 
-  def material_frontend(app_dir, project) do
-    material_kit_assets = "#{app_dir}/priv/static/frontend/assets"
-    File.cp_r(material_kit_assets, File.cwd!() <> "/priv/static/frontend")
-
-    # frontend controller 
-    Mix.Generator.create_file(
-      File.cwd!() <> "/lib//#{project.alias_name}_web/controllers/landing_page_controller.ex",
-      EEx.eval_file("#{app_dir}/priv/templates/phx.gen.theme/landing_page_controller.ex",
-        project: project
-      )
-    )
-
-    # frontend view
-    material_loginview_ex =
-      File.cwd!() <> "/lib/#{project.alias_name}_web/views" <> "/landing_page_view.ex"
-
-    Mix.Generator.create_file(
-      material_loginview_ex,
-      EEx.eval_file("#{app_dir}/priv/templates/phx.gen.theme/landing_page_view.ex",
-        project: project
-      )
-    )
-
-    # frontend layout
-
-    material_frontend_ex =
-      File.cwd!() <> "/lib/#{project.alias_name}_web/templates/layout" <> "/frontend.html.eex"
-
-    Mix.Generator.create_file(
-      material_frontend_ex,
-      EEx.eval_file("#{app_dir}/priv/templates/layout/material_frontend.html.eex",
-        project: project
-      )
-    )
-
-    # login template
-    material_login_html_ex =
-      File.cwd!() <> "/lib/#{project.alias_name}_web/templates/landing_page" <> "/index.html.eex"
-
-    Mix.Generator.create_file(
-      material_login_html_ex,
-      EEx.eval_file("#{app_dir}/priv/templates/phx.gen.theme/landing_index.html.eex",
-        project: project
-      )
-    )
-  end
-
-  def material_dashboard(app_dir, project) do
-    material_dashboard_assets = "#{app_dir}/priv/static/assets"
-    File.cp_r(material_dashboard_assets, File.cwd!() <> "/priv/static")
-
-    material_app_ex =
-      File.cwd!() <> "/lib/#{project.alias_name}_web/templates/layout" <> "/app.html.eex"
-
-    Mix.Generator.create_file(
-      material_app_ex,
-      EEx.eval_file("#{app_dir}/priv/templates/layout/material_app.html.eex", project: project)
-    )
-
-    material_blank_ex =
-      File.cwd!() <> "/lib/#{project.alias_name}_web/templates/layout" <> "/blank.html.eex"
-
-    Mix.Generator.create_file(
-      material_blank_ex,
-      EEx.eval_file("#{app_dir}/priv/templates/layout/material_blank.html.eex", project: project)
-    )
-  end
-
   def material_login(app_dir, project) do
     # login controller 
     Mix.Generator.create_file(
@@ -132,8 +64,6 @@ defmodule Mix.Tasks.Phx.Gen.Theme do
     project = Application.get_env(:red_potion, :project)
     app_dir = Application.app_dir(:phoenix)
 
-    material_frontend(app_dir, project)
-    material_dashboard(app_dir, project)
     material_login(app_dir, project)
 
     utility_ex = File.cwd!() <> "/lib//utility.ex"

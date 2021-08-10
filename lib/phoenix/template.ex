@@ -89,7 +89,7 @@ defmodule Phoenix.Template do
   New encoders can be added via the format encoder option:
 
       config :phoenix, :format_encoders,
-        html: Phoenix.Template.HTML
+        html: Phoenix.HTML.Engine
 
   """
 
@@ -138,7 +138,7 @@ defmodule Phoenix.Template do
       root = Keyword.fetch!(options, :root)
       @phoenix_root Path.relative_to_cwd(root)
       @phoenix_pattern Keyword.get(options, :pattern, unquote(@default_pattern))
-      @phoenix_template_engines Keyword.get(options, :template_engines, %{})
+      @phoenix_template_engines Enum.into(Keyword.get(options, :template_engines, %{}), Template.engines())
       @before_compile unquote(__MODULE__)
 
       @doc """
@@ -160,11 +160,11 @@ defmodule Phoenix.Template do
     root    = Module.get_attribute(env.module, :phoenix_root)
     pattern = Module.get_attribute(env.module, :phoenix_pattern)
     engines = Module.get_attribute(env.module, :phoenix_template_engines)
-    engines = Enum.into(engines, engines())
 
-    pairs = for path <- find_all(root, pattern) do
-      compile(path, root, engines)
-    end
+    pairs =
+      for path <- find_all(root, pattern, engines) do
+        compile(path, root, engines)
+      end
 
     names = Enum.map(pairs, &elem(&1, 0))
     codes = Enum.map(pairs, &elem(&1, 1))
@@ -185,18 +185,14 @@ defmodule Phoenix.Template do
         template_not_found(template, Map.put(assigns, :__phx_template_not_found__, __MODULE__))
       end
 
-      @doc """
-      Returns the template root alongside all templates.
-      """
+      @doc false
       def __templates__ do
         {@phoenix_root, @phoenix_pattern, unquote(names)}
       end
 
-      @doc """
-      Returns true whenever the list of templates changes in the filesystem.
-      """
+      @doc false
       def __phoenix_recompile__? do
-        unquote(hash(root, pattern)) != Template.hash(@phoenix_root, @phoenix_pattern)
+        unquote(hash(root, pattern, engines)) != Template.hash(@phoenix_root, @phoenix_pattern, @phoenix_template_engines)
       end
     end
   end
@@ -225,7 +221,7 @@ defmodule Phoenix.Template do
   end
 
   defp default_encoders do
-    [html: Phoenix.Template.HTML, json: Phoenix.json_library(), js: Phoenix.Template.HTML]
+    [html: Phoenix.HTML.Engine, json: Phoenix.json_library(), js: Phoenix.HTML.Engine]
   end
 
   @doc """
@@ -314,9 +310,9 @@ defmodule Phoenix.Template do
   @doc """
   Returns all template paths in a given template root.
   """
-  @spec find_all(root, pattern :: String.t) :: [path]
-  def find_all(root, pattern \\ @default_pattern) do
-    extensions = engines() |> Map.keys() |> Enum.join(",")
+  @spec find_all(root, pattern :: String.t(), %{atom => module}) :: [path]
+  def find_all(root, pattern \\ @default_pattern, engines \\ engines()) do
+    extensions = engines |> Map.keys() |> Enum.join(",")
 
     root
     |> Path.join(pattern <> ".{#{extensions}}")
@@ -328,9 +324,9 @@ defmodule Phoenix.Template do
 
   Used by Phoenix to check if a given root path requires recompilation.
   """
-  @spec hash(root, pattern :: String.t) :: binary
-  def hash(root, pattern \\ @default_pattern) do
-    find_all(root, pattern)
+  @spec hash(root, pattern :: String.t, %{atom => module}) :: binary
+  def hash(root, pattern \\ @default_pattern, engines \\ engines()) do
+    find_all(root, pattern, engines)
     |> Enum.sort()
     |> :erlang.md5()
   end

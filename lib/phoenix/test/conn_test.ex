@@ -68,12 +68,12 @@ defmodule Phoenix.ConnTest do
 
   Under other circumstances, you may be testing a view or another layer that
   requires a connection for processing. For such cases, a connection can be
-  created using the `conn/3` helper:
+  created using the `build_conn/3` helper:
 
       MyApp.UserView.render("hello.html", conn: build_conn(:get, "/"))
 
   While `build_conn/0` returns a connection with no request information to it,
-  `build_conn/2` returns a connection with the given request information already
+  `build_conn/3` returns a connection with the given request information already
   filled in.
 
   ## Recycling
@@ -112,6 +112,17 @@ defmodule Phoenix.ConnTest do
 
   @doc false
   defmacro __using__(_) do
+    IO.warn """
+    Using Phoenix.ConnTest is deprecated, instead of:
+
+        use Phoenix.ConnTest
+
+    do:
+
+        import Plug.Conn
+        import Phoenix.ConnTest
+    """, Macro.Env.stacktrace(__CALLER__)
+
     quote do
       import Plug.Conn
       import Phoenix.ConnTest
@@ -130,15 +141,6 @@ defmodule Phoenix.ConnTest do
   end
 
   @doc """
-  Deprecated version of `conn/0`. Use `build_conn/0` instead.
-  """
-  @spec conn() :: Conn.t
-  def conn() do
-    IO.warn "using conn/0 to build a connection is deprecated. Use build_conn/0 instead"
-    build_conn()
-  end
-
-  @doc """
   Creates a connection to be used in upcoming requests
   with a preset method, path and body.
 
@@ -150,18 +152,6 @@ defmodule Phoenix.ConnTest do
     Plug.Adapters.Test.Conn.conn(%Conn{}, method, path, params_or_body)
     |> Conn.put_private(:plug_skip_csrf_protection, true)
     |> Conn.put_private(:phoenix_recycled, true)
-  end
-
-  @doc """
-  Deprecated version of `conn/3`. Use `build_conn/3` instead.
-  """
-  @spec conn(atom | binary, binary, binary | list | map | nil) :: Conn.t
-  def conn(method, path, params_or_body \\ nil) do
-    IO.warn """
-    using conn/3 to build a connection is deprecated. Use build_conn/3 instead.
-    #{Exception.format_stacktrace()}
-    """
-    build_conn(method, path, params_or_body)
   end
 
   @http_methods [:get, :post, :put, :patch, :delete, :options, :connect, :trace, :head]
@@ -257,6 +247,12 @@ defmodule Phoenix.ConnTest do
   defp from_set_to_sent(conn), do: conn
 
   @doc """
+  Inits a session used exclusively for testing.
+  """
+  @spec init_test_session(Conn.t, map | keyword) :: Conn.t
+  defdelegate init_test_session(conn, session), to: Plug.Test
+
+  @doc """
   Puts a request cookie.
   """
   @spec put_req_cookie(Conn.t, binary, binary) :: Conn.t
@@ -277,13 +273,13 @@ defmodule Phoenix.ConnTest do
   @doc """
   Gets the whole flash storage.
   """
-  @spec get_flash(Conn.t) :: Conn.t
+  @spec get_flash(Conn.t) :: map
   defdelegate get_flash(conn), to: Phoenix.Controller
 
   @doc """
   Gets the given key from the flash storage.
   """
-  @spec get_flash(Conn.t, term) :: Conn.t
+  @spec get_flash(Conn.t, term) :: term
   defdelegate get_flash(conn, key), to: Phoenix.Controller
 
   @doc """
@@ -370,7 +366,7 @@ defmodule Phoenix.ConnTest do
     if given == status do
       body
     else
-      raise "expected response with status #{given}, got: #{status}, with body:\n#{body}"
+      raise "expected response with status #{given}, got: #{status}, with body:\n#{inspect(body)}"
     end
   end
 
@@ -516,7 +512,7 @@ defmodule Phoenix.ConnTest do
 
   For example, imagine you are testing an authentication plug in
   isolation, but you need to invoke the Endpoint plugs and router
-  Ripelines to set up session and flash related dependencies.
+  pipelines to set up session and flash related dependencies.
   One option is to invoke an existing route that uses the proper
   pipelines. You can do so by passing the connection and the
   router name to `bypass_through`:
@@ -675,7 +671,7 @@ defmodule Phoenix.ConnTest do
     try do
       {:ok, func.()}
     catch
-      kind, error -> {:error, {kind, error, System.stacktrace()}}
+      kind, error -> {:error, {kind, error, __STACKTRACE__}}
     end
   end
 end

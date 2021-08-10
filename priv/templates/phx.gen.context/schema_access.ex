@@ -43,22 +43,9 @@
 
   """
   def create_<%= schema.singular %>(attrs \\ %{}) do
-    a = 
     %<%= inspect schema.alias %>{}
     |> <%= inspect schema.alias %>.changeset(attrs)
     |> Repo.insert()
-  
-    case a do
-      {:ok, model} ->
-        WebAccWeb.Endpoint.broadcast("user:lobby", "model_update", %{
-          source: model.__meta__.source,
-          data: Utility.s_to_map(model)
-        })
-
-      _ ->
-        nil
-    end
-    a 
   end
 
   @doc """
@@ -74,23 +61,9 @@
 
   """
   def update_<%= schema.singular %>(%<%= inspect schema.alias %>{} = <%= schema.singular %>, attrs) do
-    a = 
     <%= schema.singular %>
     |> <%= inspect schema.alias %>.changeset(attrs)
     |> Repo.update()
-
-    case a do
-      {:ok, model} ->
-        WebAccWeb.Endpoint.broadcast("user:lobby", "model_update", %{
-          source: model.__meta__.source,
-          data: Utility.s_to_map(model)
-        })
-
-      _ ->
-        nil
-    end
-
-    a 
   end
 
   @doc """
@@ -115,9 +88,9 @@
   ## Examples
 
       iex> change_<%= schema.singular %>(<%= schema.singular %>)
-      %Ecto.Changeset{source: %<%= inspect schema.alias %>{}}
+      %Ecto.Changeset{data: %<%= inspect schema.alias %>{}}
 
   """
-  def change_<%= schema.singular %>(%<%= inspect schema.alias %>{} = <%= schema.singular %>) do
-    <%= inspect schema.alias %>.changeset(<%= schema.singular %>, %{})
+  def change_<%= schema.singular %>(%<%= inspect schema.alias %>{} = <%= schema.singular %>, attrs \\ %{}) do
+    <%= inspect schema.alias %>.changeset(<%= schema.singular %>, attrs)
   end
