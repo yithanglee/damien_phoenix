@@ -15,6 +15,13 @@ defmodule Phoenix.Router do
     end
   end
 
+  defmodule MalformedURIError do
+    @moduledoc """
+    Exception raised when the URI is malformed on matching.
+    """
+    defexception [:message, plug_status: 400]
+  end
+
   @moduledoc """
   Defines a Phoenix router.
 
@@ -28,16 +35,71 @@ defmodule Phoenix.Router do
         get "/pages/:page", PageController, :show
       end
 
-  The `get/3` macro above accepts a request of format `"/pages/VALUE"` and
-  dispatches it to the show action in the `PageController`.
-
-  Routes can also match glob-like patterns, routing any path with a common
-  base to the same controller. For example:
-
-      get "/dynamic*anything", DynamicController, :show
+  The `get/3` macro above accepts a request to `/pages/hello` and dispatches
+  it to the `PageController`'s `show` action with `%{"page" => "hello"}` in
+  `params`.
 
   Phoenix's router is extremely efficient, as it relies on Elixir
   pattern matching for matching routes and serving requests.
+
+  ## Routing
+
+  `get/3`, `post/3`, `put/3` and other macros named after HTTP verbs are used
+  to create routes.
+
+  The route:
+
+      get "/pages", PageController, :index
+
+  matches a `GET` request to `/pages` and dispatches it to the `index` action in
+  `PageController`.
+
+      get "/pages/:page", PageController, :show
+
+  matches `/pages/hello` and dispatches to the `show` action with
+  `%{"page" => "hello"}` in `params`.
+
+      defmodule PageController do
+        def show(conn, params) do
+          # %{"page" => "hello"} == params
+        end
+      end
+
+  Partial and multiple segments can be matched. For example:
+
+      get "/api/v:version/pages/:id", PageController, :show
+
+  matches `/api/v1/pages/2` and puts `%{"version" => "1", "id" => "2"}` in
+  `params`. Only the trailing part of a segment can be captured.
+
+  Routes are matched from top to bottom. The second route here:
+
+      get "/pages/:page", PageController, :show
+      get "/pages/hello", PageController, :hello
+
+  will never match `/pages/hello` because `/pages/:page` matches that first.
+
+  Routes can use glob-like patterns to match trailing segments.
+
+      get "/pages/*page", PageController, :show
+
+  matches `/pages/hello/world` and puts the globbed segments in `params["page"]`.
+
+      GET /pages/hello/world
+      %{"page" => ["hello", "world"]} = params
+
+  Globs can match segments partially too. The difference is the whole segment
+  is captured along with the trailing segments.
+
+      get "/pages/he*page", PageController, :show
+
+  matches
+
+      GET /pages/hello/world
+      %{"page" => ["hello", "world"]} = params
+
+      GET /pages/hey/world
+      %{"page" => ["hey", "world"]} = params
 
   ## Helpers
 
@@ -67,8 +129,8 @@ defmodule Phoenix.Router do
   If the route contains glob-like patterns, parameters for those have to be given as
   list:
 
-      MyAppWeb.Router.Helpers.dynamic_path(conn_or_endpoint, :show, ["dynamic", "something"])
-      "/dynamic/something"
+      MyAppWeb.Router.Helpers.pages_path(conn_or_endpoint, :show, ["hello", "world"])
+      "/pages/hello/world"
 
   The URL generated in the named URL helpers is based on the configuration for
   `:url`, `:http` and `:https`. However, if for some reason you need to manually
@@ -191,16 +253,18 @@ defmodule Phoenix.Router do
   @http_methods [:get, :post, :put, :patch, :delete, :options, :connect, :trace, :head]
 
   @doc false
-  defmacro __using__(_) do
+  defmacro __using__(opts) do
     quote do
-      unquote(prelude())
+      unquote(prelude(opts))
       unquote(defs())
       unquote(match_dispatch())
     end
   end
 
-  defp prelude() do
+  defp prelude(opts) do
     quote do
+      @helpers_moduledoc Keyword.get(unquote(opts), :helpers_moduledoc, true)
+
       Module.register_attribute __MODULE__, :phoenix_routes, accumulate: true
       @phoenix_forwards %{}
 
@@ -278,7 +342,7 @@ defmodule Phoenix.Router do
     conn = prepare.(conn, metadata)
     start = System.monotonic_time()
     metadata = %{metadata | conn: conn}
-    :telemetry.execute([:phoenix, :router_dispatch, :start], %{time: start}, metadata)
+    :telemetry.execute([:phoenix, :router_dispatch, :start], %{system_time: System.system_time()}, metadata)
 
     case pipeline.(conn) do
       %Plug.Conn{halted: true} = halted_conn ->
@@ -295,15 +359,15 @@ defmodule Phoenix.Router do
         rescue
           e in Plug.Conn.WrapperError ->
             measurements = %{duration: System.monotonic_time() - start}
-            metadata = %{kind: :error, error: e, stacktrace: System.stacktrace()}
-            :telemetry.execute([:phoenix, :router_dispatch, :failure], measurements, metadata)
+            metadata = Map.merge(metadata, %{conn: conn, kind: :error, error: e, reason: e, stacktrace: __STACKTRACE__})
+            :telemetry.execute([:phoenix, :router_dispatch, :exception], measurements, metadata)
             Plug.Conn.WrapperError.reraise(e)
         catch
-          :error, reason ->
+          kind, reason ->
             measurements = %{duration: System.monotonic_time() - start}
-            metadata = %{kind: :error, error: reason, stacktrace: System.stacktrace()}
-            :telemetry.execute([:phoenix, :router_dispatch, :failure], measurements, metadata)
-            Plug.Conn.WrapperError.reraise(piped_conn, :error, reason, System.stacktrace())
+            metadata = Map.merge(metadata, %{conn: conn, kind: kind, reason: reason, stacktrace: __STACKTRACE__})
+            :telemetry.execute([:phoenix, :router_dispatch, :exception], measurements, metadata)
+            Plug.Conn.WrapperError.reraise(piped_conn, kind, reason, __STACKTRACE__)
         end
     end
   end
@@ -326,7 +390,15 @@ defmodule Phoenix.Router do
       def call(conn, _opts) do
         %{method: method, path_info: path_info, host: host} = conn = prepare(conn)
 
-        case __match_route__(method, Enum.map(path_info, &URI.decode/1), host) do
+        decoded =
+          try do
+            Enum.map(path_info, &URI.decode/1)
+          rescue
+            ArgumentError ->
+              raise MalformedURIError, "malformed URI path: #{inspect conn.request_path}"
+          end
+
+        case __match_route__(method, decoded, host) do
           :error -> raise NoRouteError, conn: conn, router: __MODULE__
           match -> Phoenix.Router.__call__(conn, match)
         end
@@ -347,7 +419,9 @@ defmodule Phoenix.Router do
     routes = env.module |> Module.get_attribute(:phoenix_routes) |> Enum.reverse
     routes_with_exprs = Enum.map(routes, &{&1, Route.exprs(&1)})
 
-    Helpers.define(env, routes_with_exprs)
+    helpers_moduledoc = Module.get_attribute(env.module, :helpers_moduledoc)
+
+    Helpers.define(env, routes_with_exprs, docs: helpers_moduledoc)
     {matches, _} = Enum.map_reduce(routes_with_exprs, %{}, &build_match/2)
 
     checks =
@@ -454,7 +528,7 @@ defmodule Phoenix.Router do
 
   defp build_pipes(name, pipe_through) do
     plugs = pipe_through |> Enum.reverse |> Enum.map(&{&1, [], true})
-    {conn, body} = Plug.Builder.compile(__ENV__, plugs, init_mode: Phoenix.plug_init_mode())
+    {conn, body} = Plug.Builder.compile(__ENV__, plugs, init_mode: Phoenix.plug_init_mode(), log_on_halt: :debug)
 
     quote do
       defp unquote(name)(unquote(conn)), do: unquote(body)
@@ -569,7 +643,7 @@ defmodule Phoenix.Router do
               Plug.Conn.WrapperError.reraise(e)
           catch
             :error, reason ->
-              Plug.Conn.WrapperError.reraise(unquote(conn), :error, reason, System.stacktrace())
+              Plug.Conn.WrapperError.reraise(unquote(conn), :error, reason, __STACKTRACE__)
           end
         end
         @phoenix_pipeline nil
@@ -777,12 +851,14 @@ defmodule Phoenix.Router do
 
   ## Examples
 
-      scope "/api/v1", as: :api_v1, alias: API.V1 do
+      scope "/api/v1", as: :api_v1 do
         get "/pages/:id", PageController, :show
       end
 
   """
   defmacro scope(path, options, do: context) do
+    options = Macro.expand(options, %{__CALLER__ | function: {:init, 1}})
+
     options = quote do
       path = unquote(path)
       case unquote(options) do
@@ -810,11 +886,14 @@ defmodule Phoenix.Router do
 
   """
   defmacro scope(path, alias, options, do: context) do
+    alias = Macro.expand(alias, %{__CALLER__ | function: {:init, 1}})
+
     options = quote do
       unquote(options)
       |> Keyword.put(:path, unquote(path))
       |> Keyword.put(:alias, unquote(alias))
     end
+
     do_scope(options, context)
   end
 
@@ -869,6 +948,7 @@ defmodule Phoenix.Router do
 
   """
   defmacro forward(path, plug, plug_opts \\ [], router_opts \\ []) do
+    plug = Macro.expand(plug, %{__CALLER__ | function: {:init, 1}})
     router_opts = Keyword.put(router_opts, :as, nil)
 
     quote unquote: true, bind_quoted: [path: path, plug: plug] do

@@ -3,31 +3,86 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
 
   alias <%= inspect context.module %>
   alias <%= inspect schema.module %>
-
+  import Ecto.Query
   def index(conn, params) do
     if Enum.any?(conn.path_info, fn x -> x == "api" end) do
       limit = String.to_integer(params["length"])
       offset = String.to_integer(params["start"])
+
+      col_key = params["columns"] |> Map.keys()
+
+      search_queries =
+        for key <- col_key do
+          val = params["columns"][key]["search"]["value"]
+
+          if val != "" do
+            {String.to_atom(params["columns"][key]["data"]), val}
+          end
+        end
+        |> Enum.reject(fn x -> x == nil end)
+        |> Enum.reject(fn x -> elem(x, 1) == nil end)
 
       column_no = params["order"]["0"]["column"]
       key = params["columns"][column_no]["data"] |> String.to_atom()
       dir = params["order"]["0"]["dir"] |> String.to_atom()
       order_by = [{dir, key}]
 
+      dirs =
+        for ord <- params["order"] |> Map.keys() do
+          key = params["columns"][params["order"][ord]["column"]]["data"] |> String.to_atom()
+          dir = params["order"][ord]["dir"] |> String.to_atom()
+
+          {dir, key}
+        end
+
+      order_by = dirs
+
+      q1 = from(a in <%= inspect schema.alias %>)
+
+      q1 = 
+        if params["name"] != nil do
+          q1 |> where([a], a.name == ^params["name"])
+        else 
+          q1 
+        end
+
+      q1 =
+        if search_queries != [] do
+          q1 |> where(^search_queries)
+        else
+          q1
+        end
+
+      q2 = 
+        from(
+          a in <%= inspect schema.alias %>,
+          limit: ^limit,
+          offset: ^offset,
+          order_by: ^order_by
+        )
+
+      q2 =
+        if params["name"] != nil do
+          q2 |> where([a], a.name == ^params["name"])
+        else
+          q2
+        end
+
+      q2 =
+        if search_queries != [] do
+          q2 |> where(^search_queries)
+        else
+          q2
+        end
+
+
       data =
-        Repo.all(from(a in <%= inspect schema.alias %>, where: ilike(a.name, ^"%#{params["search"]["value"]}%")))
+        Repo.all(q1)
 
       data2 =
-        Repo.all(
-          from(
-            a in <%= inspect schema.alias %>,
-            where: ilike(a.name, ^"%#{params["search"]["value"]}%"),
-            limit: ^limit,
-            offset: ^offset,
-            order_by: ^order_by
-          )
-        )
+        Repo.all(q2)
         |> Enum.map(fn x -> Utility.s_to_map(x) end)
+        
       json =
       %{
         data: data2,
@@ -130,6 +185,7 @@ defmodule <%= inspect context.web_module %>.<%= inspect Module.concat(schema.web
         conn
         |> put_flash(:info, "<%= schema.human_singular %> updated successfully.")
         |> redirect(to: Routes.<%= schema.route_helper %>_path(conn, :show, <%= schema.singular %>))
+
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, "edit.html", <%= schema.singular %>: <%= schema.singular %>, changeset: changeset)
     end

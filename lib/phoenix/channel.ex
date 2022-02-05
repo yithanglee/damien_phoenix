@@ -57,11 +57,21 @@ defmodule Phoenix.Channel do
         {:noreply, socket}
       end
 
-  You can also push a message directly down the socket:
+  General message payloads are received as maps, and binary data payloads are
+  passed as a `{:binary, data}` tuple:
+
+      def handle_in("file_chunk", {:binary, chunk}, socket) do
+        ...
+        {:reply, :ok, socket}
+      end
+
+  You can also push a message directly down the socket, in the form of a map,
+  or a tagged `{:binary, data}` tuple:
 
       # client asks for their current rank, push sent directly as a new event.
       def handle_in("current_rank", _, socket) do
         push(socket, "current_rank", %{val: Game.get_rank(socket.assigns[:user])})
+        push(socket, "photo", {:binary, File.read!(socket.assigns.photo_path)})
         {:noreply, socket}
       end
 
@@ -99,6 +109,10 @@ defmodule Phoenix.Channel do
           {:reply, :error, socket}
         end
       end
+
+  Like binary pushes, binary data is also supported with replies via a `{:binary, data}` tuple:
+
+      {:reply, {:ok, {:binary, bin}}, socket}
 
   ## Intercepting Outgoing Events
 
@@ -258,6 +272,15 @@ defmodule Phoenix.Channel do
 
   You can also set it to `:infinity` to fully disable it.
 
+  ## Shutdown
+
+  You can configure the shutdown of each channel used when your application
+  is shutting down by setting the `:shutdown` value on use:
+
+      use Phoenix.Channel, shutdown: 5_000
+
+  It defaults to 5_000.
+
   ## Logging
 
   By default, channel `"join"` and `"handle_in"` events are logged, using
@@ -330,7 +353,7 @@ defmodule Phoenix.Channel do
   @doc """
   Handle regular Elixir process messages.
 
-  See `GenServer.handle_info/2`.
+  See `c:GenServer.handle_info/2`.
   """
   @callback handle_info(msg :: term, socket :: Socket.t()) ::
               {:noreply, Socket.t()}
@@ -339,7 +362,7 @@ defmodule Phoenix.Channel do
   @doc """
   Handle regular GenServer call messages.
 
-  See `GenServer.handle_call/3`.
+  See `c:GenServer.handle_call/3`.
   """
   @callback handle_call(msg :: term, from :: {pid, tag :: term}, socket :: Socket.t()) ::
               {:reply, response :: term, Socket.t()}
@@ -349,7 +372,7 @@ defmodule Phoenix.Channel do
   @doc """
   Handle regular GenServer cast messages.
 
-  See `GenServer.handle_cast/2`.
+  See `c:GenServer.handle_cast/2`.
   """
   @callback handle_cast(msg :: term, socket :: Socket.t()) ::
               {:noreply, Socket.t()}
@@ -364,7 +387,7 @@ defmodule Phoenix.Channel do
   @doc """
   Invoked when the channel process is about to exit.
 
-  See `GenServer.terminate/2`.
+  See `c:GenServer.terminate/2`.
   """
   @callback terminate(
               reason :: :normal | :shutdown | {:shutdown, :left | :closed | term},
@@ -390,9 +413,19 @@ defmodule Phoenix.Channel do
       @phoenix_log_join Keyword.get(opts, :log_join, :info)
       @phoenix_log_handle_in Keyword.get(opts, :log_handle_in, :debug)
       @phoenix_hibernate_after Keyword.get(opts, :hibernate_after, 15_000)
+      @phoenix_shutdown Keyword.get(opts, :shutdown, 5000)
 
       import unquote(__MODULE__)
-      import Phoenix.Socket, only: [assign: 3]
+      import Phoenix.Socket, only: [assign: 3, assign: 2]
+
+      def child_spec(init_arg) do
+        %{
+          id: __MODULE__,
+          start: {__MODULE__, :start_link, [init_arg]},
+          shutdown: @phoenix_shutdown,
+          restart: :temporary
+        }
+      end
 
       def start_link(triplet) do
         GenServer.start_link(Phoenix.Channel.Server, triplet,
@@ -530,7 +563,7 @@ defmodule Phoenix.Channel do
   """
   def push(socket, event, message) do
     %{transport_pid: transport_pid, topic: topic} = assert_joined!(socket)
-    Server.push(transport_pid, topic, event, message, socket.serializer)
+    Server.push(transport_pid, socket.join_ref, topic, event, message, socket.serializer)
   end
 
   @doc """

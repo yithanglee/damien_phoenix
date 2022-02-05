@@ -2,7 +2,15 @@ defmodule Phoenix.Endpoint.Watcher do
   @moduledoc false
   require Logger
 
-  def start_link(cmd, args, opts) do
+  def child_spec(args) do
+    %{
+      id: make_ref(),
+      start: {__MODULE__, :start_link, [args]},
+      restart: :transient
+    }
+  end
+
+  def start_link({cmd, args, opts}) do
     Task.start_link(__MODULE__, :watch, [to_string(cmd), args, opts])
   end
 
@@ -30,7 +38,7 @@ defmodule Phoenix.Endpoint.Watcher do
     end
   end
 
-  # We specially handle node to make sure we
+  # We specially handle Node.js to make sure we
   # provide a good getting started experience.
   defp validate("node", [script|_], merged_opts) do
     script_path = Path.expand(script, cd(merged_opts))
@@ -39,13 +47,13 @@ defmodule Phoenix.Endpoint.Watcher do
       !System.find_executable("node") ->
         Logger.error "Could not start watcher because \"node\" is not available. Your Phoenix " <>
                      "application is still running, however assets won't be compiled. " <>
-                     "You may fix this by installing \"node\" and then running \"cd assets && npm install\"."
+                     "You may fix this by installing \"node\" and then running \"npm install\" inside the \"assets\" directory."
         exit(:shutdown)
 
       not File.exists?(script_path) ->
-        Logger.error "Could not start node watcher because script #{inspect script_path} does not " <>
+        Logger.error "Could not start Node.js watcher because script #{inspect script_path} does not " <>
                      "exist. Your Phoenix application is still running, however assets " <>
-                     "won't be compiled. You may fix this by running \"cd assets && npm install\"."
+                     "won't be compiled. You may fix this by running \"npm install\" inside the \"assets\" directory."
         exit(:shutdown)
 
       true -> :ok

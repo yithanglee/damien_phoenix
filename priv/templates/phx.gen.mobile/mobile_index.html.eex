@@ -1,0 +1,133 @@
+        <div class="task-slider owl-carousel owl-no-dots">
+            <a href="#" data-menu="menu-task-group">
+                <div data-card-height="170" class="card rounded-m shadow-l">
+                    <div class="card-top">
+                        <span class="icon icon-m rounded-circle bg-blue2-light ml-3 mt-3"><i class="fa color-white fa-calendar"></i></span>
+                    </div>
+                    <div class="card-bottom">
+                        <h4 class="color-theme font-15 mb-3 ml-3">Daily <br> Tasklist</h4>
+                    </div>
+                    <div class="card-overlay bg-theme"></div>
+                </div>
+            </a>     
+            <a href="#" data-menu="menu-task-group">
+                <div data-card-height="170" class="card rounded-m shadow-l">
+                    <div class="card-top">
+                        <span class="icon icon-m rounded-circle bg-red2-light ml-3 mt-3"><i class="fa color-white fa-heart"></i></span>
+                    </div>
+                    <div class="card-bottom">
+                        <h4 class="color-theme font-15 mb-3 ml-3">Team <br> Building</h4>
+                    </div>
+                    <div class="card-overlay bg-theme"></div>
+                </div>
+            </a>
+            <a href="#" data-menu="menu-task-group">
+                <div data-card-height="170" class="card rounded-m shadow-l">
+                    <div class="card-top">
+                        <span class="icon icon-m rounded-circle bg-green1-light ml-3 mt-3"><i class="fa color-white fa-check"></i></span>
+                    </div>
+                    <div class="card-bottom">
+                        <h4 class="color-theme font-15 mb-3 ml-3">Product<br>Development</h4>
+                    </div>
+                    <div class="card-overlay bg-theme"></div>
+                </div>
+            </a>
+            <a href="#" data-menu="menu-task-group">
+                <div data-card-height="170" class="card rounded-m shadow-l">
+                    <div class="card-top">
+                        <span class="icon icon-m rounded-circle bg-brown1-light ml-3 mt-3"><i class="fa color-white fa-brush"></i></span>
+                    </div>
+                    <div class="card-bottom">
+                        <h4 class="color-theme font-15 mb-3 ml-3">Website <br> Re-Design</h4>
+                    </div>
+                    <div class="card-overlay bg-theme"></div>
+                </div>
+            </a>
+            <a href="#" data-menu="menu-task-group">
+                <div data-card-height="170" class="card rounded-m shadow-l">
+                    <div class="card-top">
+                        <span class="icon icon-m rounded-circle bg-blue2-light ml-3 mt-3"><i class="fa color-white fa-calendar"></i></span>
+                    </div>
+                    <div class="card-bottom">
+                        <h4 class="color-theme font-15 mb-3 ml-3">Daily <br> Tasklist</h4>
+                    </div>
+                    <div class="card-overlay bg-theme"></div>
+                </div>
+            </a>     
+            <a href="#" data-menu="menu-task-group">
+                <div data-card-height="170" class="card rounded-m shadow-l">
+                    <div class="card-top">
+                        <span class="icon icon-m rounded-circle bg-red2-light ml-3 mt-3"><i class="fa color-white fa-heart"></i></span>
+                    </div>
+                    <div class="card-bottom">
+                        <h4 class="color-theme font-15 mb-3 ml-3">Team <br> Building</h4>
+                    </div>
+                    <div class="card-overlay bg-theme"></div>
+                </div>
+            </a>
+            <a href="#" data-menu="menu-task-group">
+                <div data-card-height="170" class="card rounded-m shadow-l">
+                    <div class="card-top">
+                        <span class="icon icon-m rounded-circle bg-green1-light ml-3 mt-3"><i class="fa color-white fa-check"></i></span>
+                    </div>
+                    <div class="card-bottom">
+                        <h4 class="color-theme font-15 mb-3 ml-3">Product<br>Development</h4>
+                    </div>
+                    <div class="card-overlay bg-theme"></div>
+                </div>
+            </a>
+            <a href="#" data-menu="menu-task-group">
+                <div data-card-height="170" class="card rounded-m shadow-l">
+                    <div class="card-top">
+                        <span class="icon icon-m rounded-circle bg-brown1-light ml-3 mt-3"><i class="fa color-white fa-brush"></i></span>
+                    </div>
+                    <div class="card-bottom">
+                        <h4 class="color-theme font-15 mb-3 ml-3">Website <br> Re-Design</h4>
+                    </div>
+                    <div class="card-overlay bg-theme"></div>
+                </div>
+            </a>
+        </div>
+
+        <div class="card card-style">
+            <div class="content mb-0">
+                <h4>Daily Tasklist</h4>
+                <p class="mb-2">
+                    Below is a simulated task list, you can add your own tasks here or you can connect to a CMS and add them by admin panel. By default this is a template.
+                </p>
+
+                <div class="list-group list-custom-large mr-2">
+                    <a data-menu="menu-task-item" href="#">
+                        <i class="fa fa-heart bg-red2-dark rounded-xl color-white font-12 font-12"></i>
+                        <span>Update Sticky</span>
+                        <strong>Essential for Customers</strong>
+                        <span class="badge bg-red2-dark mr-2">VIP</span>
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                    <a data-menu="menu-task-item" href="#">
+                        <i class="fa fa-check rounded-xl bg-green1-dark color-white font-12"></i>
+                        <span>Create New Page</span>
+                        <strong>With New Design Patterns</strong>
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                    <a data-menu="menu-task-item" href="#">
+                        <i class="fa fa-cog rounded-xl bg-magenta1-dark color-white font-12"></i>
+                        <span>Upgade Components</span>
+                        <strong>More Poweful Features</strong>
+                        <i class="fa fa-angle-right"></i>
+                    </a>      
+                    <a data-menu="menu-task-item" href="#">
+                        <i class="fa fa-bolt rounded-xl bg-yellow1-dark color-white font-12"></i>
+                        <span>Load Faster</span>
+                        <strong>More Poweful Features</strong>
+                        <i class="fa fa-angle-right"></i>
+                    </a>        
+                    <a data-menu="menu-task-item" href="#" class="no-border">
+                        <i class="fa fa-mobile-alt rounded-xl bg-blue2-dark color-white font-12"></i>
+                        <span>Release PWA Version</span>
+                        <strong>More Poweful Features</strong>
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                </div>  
+            </div>
+        </div>
